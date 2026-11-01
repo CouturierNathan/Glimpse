@@ -20,7 +20,8 @@ Epitech PGE5, Blockchain & dApps (G-ING-910). Roadmap and architecture:
 | C: blockchain, issuers, verification | Contracts, issuer registry, revocation, indexer, verifier, testnet | Marius Rousset   |
 
 Tickets: [issues](https://github.com/paulbardeur/blockchain/issues), labelled `pole:A`, `pole:B`,
-`pole:C` and `shared`.
+`pole:C` and `shared`, tracked on the [Glimpse board](https://github.com/users/anpawo/projects/4)
+(fields Status, Pole, Phase, Milestone).
 
 ## Dates
 
