@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+coverage/
+.next/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+contracts/artifacts/
+contracts/cache/
+contracts/types/
+contracts/ignition/deployments/chain-31337/

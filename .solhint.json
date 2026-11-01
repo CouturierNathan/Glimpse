@@ -1,0 +1,18 @@
+{
+  "extends": "solhint:recommended",
+  "rules": {
+    "compiler-version": ["error", "^0.8.28"],
+    "func-visibility": [
+      "error",
+      {
+        "ignoreConstructors": true
+      }
+    ],
+    "no-console": "error",
+    "gas-custom-errors": "error",
+    "reason-string": "off",
+    "no-empty-blocks": "error",
+    "not-rely-on-time": "off",
+    "use-natspec": "off"
+  }
+}
