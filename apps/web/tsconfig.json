@@ -6,6 +6,7 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "noEmit": true,
+    "declaration": false,
     "allowJs": false,
     "incremental": true,
     "allowImportingTsExtensions": true,
