@@ -13,3 +13,8 @@ export const navItems: readonly NavItem[] = [
 export function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
+
+/** Where to send the user after sign-in. Only app routes are allowed, to rule out open redirects. */
+export function safeNextPath(next: unknown): NavItem['href'] {
+  return navItems.find((item) => item.href === next)?.href ?? '/dashboard'
+}

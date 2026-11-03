@@ -5,6 +5,7 @@
   --border: #e7e5e4;
   --accent: #4338ca;
   --accent-fg: #ffffff;
+  --error: #b91c1c;
   color-scheme: light dark;
 }
 
@@ -16,6 +17,7 @@
     --border: #44403c;
     --accent: #818cf8;
     --accent-fg: #1c1917;
+    --error: #f87171;
   }
 }
 
@@ -67,8 +69,15 @@ a {
   font-weight: 600;
 }
 
-.header .button {
+.account {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   margin-left: auto;
+}
+
+.address {
+  font-family: ui-monospace, monospace;
 }
 
 .button {
@@ -78,7 +87,29 @@ a {
   background: var(--accent);
   color: var(--accent-fg);
   text-decoration: none;
+  font: inherit;
   font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.button.secondary {
+  background: transparent;
+  color: var(--fg);
+  border-color: var(--border);
+}
+
+.panel {
+  margin-top: 1.5rem;
+}
+
+.main .error {
+  color: var(--error);
 }
 
 .main {
