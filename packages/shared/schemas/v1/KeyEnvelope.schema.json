@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimpse.example/schemas/v1/KeyEnvelope.schema.json",
+  "title": "KeyEnvelope",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "envelopeId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "itemId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "itemVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "keyId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "recipientId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "recipientKeyId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "grantId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "algorithm": {
+      "const": "RSA-OAEP-256"
+    },
+    "wrappedKey": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?$",
+      "minLength": 342
+    },
+    "labelVersion": {
+      "const": "1"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "envelopeId",
+    "itemId",
+    "itemVersion",
+    "keyId",
+    "recipientId",
+    "recipientKeyId",
+    "grantId",
+    "algorithm",
+    "wrappedKey",
+    "labelVersion"
+  ],
+  "additionalProperties": false
+}
