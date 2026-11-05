@@ -1,0 +1,2 @@
+# Local encrypted object storage. Never commit demo payloads or temporary writes.
+.vault-data/
