@@ -1,0 +1,18 @@
+{
+  "name": "@glimpse/contracts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "hardhat build",
+    "test": "hardhat build && tsc --noEmit -p tsconfig.json && hardhat test nodejs",
+    "deploy:base-sepolia": "hardhat ignition deploy ignition/modules/Glimpse.ts --network baseSepolia",
+    "demo": "hardhat run scripts/demo.ts"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ignition": "^3.1.9",
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.7",
+    "@openzeppelin/contracts": "^5.6.1",
+    "hardhat": "^3.21.2",
+    "viem": "^2.57.16"
+  }
+}
