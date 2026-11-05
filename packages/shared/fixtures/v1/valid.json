@@ -1,0 +1,62 @@
+{
+  "ExtractedClaim": {
+    "schemaVersion": "1.0.0",
+    "claimId": "00000000000000000000000000000001",
+    "attribute": "synthetic.score",
+    "value": {
+      "type": "number",
+      "value": 42
+    },
+    "period": {
+      "start": "2026-01-01",
+      "end": "2026-12-31"
+    },
+    "document": {
+      "documentId": "00000000000000000000000000000002",
+      "documentVersion": 1,
+      "provenance": {
+        "class": "A"
+      }
+    },
+    "pages": [1, 2],
+    "confidence": 0.85
+  },
+  "EncryptedRecord": {
+    "schemaVersion": "1.0.0",
+    "itemId": "00000000000000000000000000000003",
+    "itemVersion": 1,
+    "keyId": "00000000000000000000000000000004",
+    "sourceClass": "A",
+    "algorithm": "A256GCM",
+    "ciphertext": "AAAAAAAAAAAAAAAAAAAAAA",
+    "iv": "AAAAAAAAAAAAAAAA",
+    "aadVersion": "1"
+  },
+  "KeyEnvelope": {
+    "schemaVersion": "1.0.0",
+    "envelopeId": "00000000000000000000000000000005",
+    "itemId": "00000000000000000000000000000003",
+    "itemVersion": 1,
+    "keyId": "00000000000000000000000000000004",
+    "recipientId": "00000000000000000000000000000006",
+    "recipientKeyId": "00000000000000000000000000000007",
+    "grantId": "00000000000000000000000000000008",
+    "algorithm": "RSA-OAEP-256",
+    "wrappedKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "labelVersion": "1"
+  },
+  "ShareGrant": {
+    "schemaVersion": "1.0.0",
+    "grantId": "00000000000000000000000000000008",
+    "itemId": "00000000000000000000000000000003",
+    "itemVersion": 1,
+    "holderId": "00000000000000000000000000000009",
+    "recipientId": "00000000000000000000000000000006",
+    "consentRequestId": "0000000000000000000000000000000a",
+    "createdAt": "2026-11-05T12:00:00.000Z",
+    "expiresAt": "2026-11-06T12:00:00.000Z",
+    "revocation": {
+      "status": "active"
+    }
+  }
+}
