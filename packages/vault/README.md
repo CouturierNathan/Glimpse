@@ -122,3 +122,11 @@ changed authenticated context, wrapped-key corruption, AES key length, provenanc
 malformed authenticated plaintext, and non-exportability. Browser DOM-only typechecking
 checks the client module without Node ambient types; cryptographic execution tests
 run on Node 24's Web Crypto implementation, not a browser automation suite.
+
+## Server storage
+
+The separate Node-only `@glimpse/vault/server` entry provides authenticated local
+object storage. See [STORAGE.md](./STORAGE.md) for configuration, A's SIWE integration
+boundary, C's opaque anchor reference and failure semantics. Never import this
+entry from browser components. The original encryption API remains browser-only
+in its intended use; storage does not provide durable private-key recovery.
