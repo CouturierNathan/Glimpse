@@ -7,6 +7,13 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./server": {
+      "browser": null,
+      "node": {
+        "types": "./src/server/index.ts",
+        "default": "./src/server/index.ts"
+      }
     }
   },
   "dependencies": {
