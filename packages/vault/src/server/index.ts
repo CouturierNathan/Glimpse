@@ -12,3 +12,4 @@ export type {
   StorageBackend,
   StorageErrorCode,
 } from './storage.ts'
+export { createFileStorageBackend, DEFAULT_STORAGE_DIRECTORY } from './files.ts'
