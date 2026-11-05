@@ -4,7 +4,8 @@
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "types": ["node"],
-    "lib": ["ES2023", "DOM"]
+    "lib": ["ES2023", "DOM"],
+    "erasableSyntaxOnly": true
   },
   "include": ["src/**/*.ts"]
 }
