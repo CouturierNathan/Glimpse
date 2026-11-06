@@ -1,0 +1,49 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_34-5809b9c0bb246d8e7fa920f50a3466eed02d95f7",
+  "solcVersion": "0.8.34",
+  "solcLongVersion": "0.8.34+commit.80d5c536",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.21.2"
+  },
+  "userSourceNameMap": {
+    "contracts/IssuerRegistry.sol": "project/contracts/IssuerRegistry.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "osaka",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/IssuerRegistry.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.28;\n\n/// @title Public directory of attestation issuers.\n/// @notice Registration is open and grants no trust: the registry only publishes which key signs\n/// for which issuer. Each requester keeps its own list of the issuerIds it accepts.\n/// An issuer has two keys: `admin` (cold, manages the entry) and `signer` (signs attestations).\n/// If the signer leaks, the admin rotates it; a single key could not be taken back.\ncontract IssuerRegistry {\n    struct Issuer {\n        address admin;\n        address signer;\n        string metadataURI;\n    }\n\n    mapping(bytes16 issuerId => Issuer) private _issuers;\n\n    event IssuerRegistered(\n        bytes16 indexed issuerId,\n        address indexed admin,\n        address indexed signer,\n        string metadataURI\n    );\n    event SignerRotated(\n        bytes16 indexed issuerId,\n        address indexed previousSigner,\n        address indexed newSigner\n    );\n\n    error InvalidIssuerId();\n    error InvalidSigner();\n    error IssuerExists(bytes16 issuerId);\n    error UnknownIssuer(bytes16 issuerId);\n    error NotIssuerAdmin(bytes16 issuerId, address caller);\n\n    /// @param issuerId Random 128-bit id chosen by the issuer.\n    /// @param metadataURI Public organisation metadata (name, website). Never holder data.\n    function register(bytes16 issuerId, address signer, string calldata metadataURI) external {\n        if (issuerId == bytes16(0)) revert InvalidIssuerId();\n        if (signer == address(0)) revert InvalidSigner();\n        if (_issuers[issuerId].admin != address(0)) revert IssuerExists(issuerId);\n        _issuers[issuerId] = Issuer(msg.sender, signer, metadataURI);\n        emit IssuerRegistered(issuerId, msg.sender, signer, metadataURI);\n    }\n\n    /// @notice Attestations anchored with the previous signer stay valid; revoke them if the key\n    /// leaked.\n    function rotateSigner(bytes16 issuerId, address newSigner) external {\n        Issuer storage issuer = _get(issuerId);\n        if (msg.sender != issuer.admin) revert NotIssuerAdmin(issuerId, msg.sender);\n        if (newSigner == address(0) || newSigner == issuer.signer) revert InvalidSigner();\n        emit SignerRotated(issuerId, issuer.signer, newSigner);\n        issuer.signer = newSigner;\n    }\n\n    function getIssuer(bytes16 issuerId) external view returns (Issuer memory) {\n        return _get(issuerId);\n    }\n\n    function _get(bytes16 issuerId) private view returns (Issuer storage issuer) {\n        issuer = _issuers[issuerId];\n        if (issuer.admin == address(0)) revert UnknownIssuer(issuerId);\n    }\n}\n"
+      }
+    }
+  }
+}
