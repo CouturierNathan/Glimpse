@@ -47,6 +47,7 @@ function setup(
     client,
     chainId: 31337,
     attestationRegistry: record.proof.verifyingContract as Address,
+    requester: request.requester as Address,
     trustedIssuers: [record.issuerId],
     answered: new Set(),
     now: () => new Date('2026-11-06T10:05:00.000Z'),
@@ -56,7 +57,7 @@ function setup(
 }
 
 const requester = privateKeyToAccount(generatePrivateKey())
-async function signedRequest(createdAt: string, changes: Partial<VerificationRequest> = {}) {
+async function signedRequest(createdAt: string, chainId = 31337) {
   const fields = {
     ...request,
     requestId: crypto.randomUUID().replaceAll('-', ''),
@@ -65,12 +66,12 @@ async function signedRequest(createdAt: string, changes: Partial<VerificationReq
     expiresAt: new Date(Date.parse(createdAt) + 15 * 60_000).toISOString(),
   }
   const signature = await requester.signTypedData({
-    domain: requestDomain(31337),
+    domain: requestDomain(chainId),
     types: requestTypes,
     primaryType: 'VerificationRequest',
     message: requestMessage(fields),
   })
-  return { ...fields, proof: { type: 'EIP712', chainId: 31337, signature }, ...changes }
+  return { ...fields, proof: { type: 'EIP712', chainId, signature } }
 }
 
 describe('verify', () => {
@@ -97,7 +98,7 @@ describe('verify', () => {
 
   it('reports an expired attestation', async () => {
     const at = '2027-06-01T00:00:00.000Z'
-    const { config } = setup({}, { now: () => new Date(at) })
+    const { config } = setup({}, { now: () => new Date(at), requester: requester.address })
     const result = await verify(await signedRequest(at), record, config)
     assert.equal(result.verdict, 'expired')
     assert.equal(result.checks.validity, 'fail')
@@ -119,6 +120,21 @@ describe('verify', () => {
     assert.equal(result.checks.provenance, 'fail')
   })
 
+  it('fails the signature when the record was not signed by the anchored signer', async () => {
+    const { config } = setup()
+    const forged = { ...record, proof: { ...record.proof, signature: request.proof.signature } }
+    const result = await verify(request, forged, config)
+    assert.equal(result.verdict, 'undetermined')
+    assert.equal(result.checks.signature, 'fail')
+  })
+
+  it('fails provenance for a record from another registry', async () => {
+    const { config } = setup({}, { attestationRegistry: `0x${'12'.repeat(20)}` })
+    const result = await verify(request, record, config)
+    assert.equal(result.verdict, 'undetermined')
+    assert.equal(result.checks.provenance, 'fail')
+  })
+
   it('fails integrity when the shared value was changed', async () => {
     const { config } = setup()
     const tampered = { ...record, value: { type: 'boolean', value: false } }
@@ -135,25 +151,27 @@ describe('verify', () => {
     assert.equal(replayed.checks.replay, 'fail')
   })
 
-  it('refuses a stale request, an altered one and one for another chain', async () => {
+  it('refuses a stale request, an altered one, one for another chain or from another requester', async () => {
     const stale = setup({}, { now: () => new Date('2026-11-06T10:20:00.000Z') })
+    const ours = setup({}, { requester: requester.address })
     const createdAt = '2026-11-06T10:00:00.000Z'
+    const altered = { ...(await signedRequest(createdAt)), purpose: 'Never signed' }
     const cases = [
       [request, stale.config],
-      [
-        await signedRequest(createdAt, { purpose: 'Something the requester never signed' }),
-        setup().config,
-      ],
-      [
-        await signedRequest(createdAt, {
-          proof: { type: 'EIP712', chainId: 1, signature: request.proof.signature },
-        }),
-        setup().config,
-      ],
+      [altered, ours.config],
+      [await signedRequest(createdAt, 1), ours.config],
+      [request, ours.config],
     ] as const
     for (const [input, config] of cases) {
       assert.equal((await verify(input, record, config)).checks.replay, 'fail')
     }
+  })
+
+  it('lets the requester retry a request after the chain was unreachable', async () => {
+    const down = setup(new Error('RPC unreachable'))
+    assert.equal((await verify(request, record, down.config)).verdict, 'undetermined')
+    const up = { ...setup().config, answered: down.config.answered }
+    assert.equal((await verify(request, record, up)).verdict, 'authentic')
   })
 
   it('stays undetermined when the chain cannot be read', async () => {

@@ -63,6 +63,8 @@ export interface VerifierConfig {
   client: Pick<PublicClient, 'readContract'>
   chainId: number
   attestationRegistry: Address
+  /** The requester running this verifier: only its own requests are answered. */
+  requester: Address
   /** The requester's own policy, kept apart from authenticity. */
   trustedIssuers: readonly string[]
   /** Request ids already answered: the requester's replay store. */
@@ -83,9 +85,16 @@ export async function verify(
   config: VerifierConfig,
 ): Promise<VerificationResult> {
   const request = parseContract('VerificationRequest', requestInput)
+  const shared = isContract('AttestationRecord', item)
+    ? { record: parseContract('AttestationRecord', item) }
+    : { claim: parseContract('ExtractedClaim', item) }
+  if (shared.claim?.document.provenance.class === 'C') {
+    throw new TypeError('A class C claim is verified through its AttestationRecord')
+  }
   const now = (config.now ?? (() => new Date()))().getTime()
   const checkedAt = new Date(Math.floor(now / 1000) * 1000).toISOString()
   const requestSigned =
+    isAddressEqual(request.requester as Address, config.requester) &&
     request.proof.chainId === config.chainId &&
     (await holds(
       verifyTypedData({
@@ -105,18 +114,14 @@ export async function verify(
   )
   if (replay === 'pass') config.answered.add(request.requestId)
 
-  if (!isContract('AttestationRecord', item)) {
-    const claim = parseContract('ExtractedClaim', item)
-    if (claim.document.provenance.class === 'C') {
-      throw new TypeError('A class C claim is verified through its AttestationRecord')
-    }
+  if (shared.claim !== undefined) {
     return parseContract('VerificationResult', {
       schemaVersion: '1.0.0',
       requestId: request.requestId,
       verdict: 'declared',
       checks: {
         signature: 'unknown',
-        provenance: claim.attribute === request.attribute ? 'unknown' : 'fail',
+        provenance: shared.claim.attribute === request.attribute ? 'unknown' : 'fail',
         integrity: 'unknown',
         validity: 'unknown',
         revocation: 'unknown',
@@ -127,7 +132,7 @@ export async function verify(
     })
   }
 
-  const record = parseContract('AttestationRecord', item)
+  const { record } = shared
   const message = {
     attestationId: hex(record.attestationId),
     issuerId: hex(record.issuerId),
@@ -156,6 +161,8 @@ export async function verify(
     .catch(() => undefined)
   let checks: VerificationResult['checks']
   if (anchor === undefined) {
+    // Nothing was decided, so the requester may retry with the same request.
+    if (replay === 'pass') config.answered.delete(request.requestId)
     checks = {
       signature: 'unknown',
       provenance: 'unknown',

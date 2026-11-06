@@ -164,6 +164,7 @@ async function requesterVerifies() {
     client: publicClient,
     chainId,
     attestationRegistry: attestationRegistry.address,
+    requester: requester.address,
     trustedIssuers: [record.issuerId],
     answered,
     now: () => at,
