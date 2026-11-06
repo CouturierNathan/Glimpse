@@ -17,6 +17,7 @@ import {
 import { attestationCommitment, attestationDomain, attestationTypes } from './attestation.ts'
 
 export * from './attestation.ts'
+export * from './indexer.ts'
 
 /** EIP-712 struct the requester signs, as documented in @glimpse/shared. */
 export const requestTypes = {
