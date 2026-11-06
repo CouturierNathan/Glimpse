@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { network } from 'hardhat'
 import { getAddress, zeroAddress } from 'viem'
-import { randomBytes } from '../attestation.ts'
+import { randomBytes } from '@glimpse/verifier'
 
 describe('IssuerRegistry', async () => {
   const { viem } = await network.create()

@@ -1,10 +1,10 @@
 // Mid-term demo (#20): an issuer signs an attestation, the holder's vault encrypts it, it is
-// anchored, then read back, decrypted and checked against the chain, then revoked.
+// anchored, decrypted and checked by a requester from the chain alone (#17), then revoked.
 // Run: npm run demo -w contracts [-- --network baseSepolia]. KEEP=1 skips the revocation.
 /* eslint-disable no-console -- a CLI demo: its printed steps are the output */
 import assert from 'node:assert/strict'
 import { network } from 'hardhat'
-import { getAddress, verifyTypedData, type Address, type Hash } from 'viem'
+import { getAddress, type Address, type Hash } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { parseContract, type ExtractedClaim } from '@glimpse/shared'
 import { decryptItem, encryptItem, generateEncryptionKeys, generateOpaqueId } from '@glimpse/vault'
@@ -14,10 +14,12 @@ import {
   attestationDomain,
   attestationTypes,
   randomBytes,
+  requestDomain,
+  requestMessage,
+  requestTypes,
+  verify,
   type AttestationContent,
-} from '../attestation.ts'
-
-const STATUS = ['unknown', 'active', 'expired', 'revoked']
+} from '@glimpse/verifier'
 
 const { viem, ignition } = await network.getOrCreate()
 const publicClient = await viem.getPublicClient()
@@ -122,40 +124,57 @@ await step(
   ]),
 )
 
-// Read back from chain and the vault, and check it the way a requester would.
-const anchor = await attestationRegistry.read.getAnchor([content.attestationId])
-const { signer } = await issuerRegistry.read.getIssuer([anchor.issuerId])
 const opened = await decryptItem(vault.record, vault.envelope, holderKeys, {
   ...item,
   keyId: vault.record.keyId,
   sourceClass: 'C',
 })
-assert.equal(
-  anchor.commitment,
-  attestationCommitment({ ...content, attribute: opened.attribute, value: opened.value }),
-  'decrypted claim matches the anchored commitment',
-)
-assert.equal(anchor.signer, signer, 'anchored by the issuer current signer')
-assert.ok(
-  await verifyTypedData({
-    address: anchor.signer,
-    domain,
-    types: attestationTypes,
-    primaryType: 'Attestation',
-    message,
-    signature,
-  }),
-  'issuer signature',
-)
-const status = async () => STATUS[await attestationRegistry.read.statusOf([content.attestationId])]
-assert.equal(await status(), 'active', 'live status')
-console.log(
-  `Read back and decrypted: ${opened.attribute} = ${JSON.stringify(opened.value.value)}, commitment, issuer signature and status active match`,
-)
-console.log(JSON.stringify(record, null, 2))
+console.log(`Decrypted from the vault: ${opened.attribute} = ${JSON.stringify(opened.value.value)}`)
+const shared = { ...record, attribute: opened.attribute, value: opened.value }
+console.log(JSON.stringify(shared, null, 2))
+
+// A requester signs a request and checks the shared record with @glimpse/verifier, which reads
+// only the chain.
+const requester = privateKeyToAccount(generatePrivateKey())
+const answered = new Set<string>()
+async function requesterVerifies() {
+  // The chain's clock: a local node runs a few seconds ahead of the wall clock.
+  const at = new Date(Number((await publicClient.getBlock()).timestamp) * 1000)
+  const fields = {
+    requestId: generateOpaqueId(),
+    requester: requester.address,
+    attribute: content.attribute,
+    purpose: 'Student discount (mid-term demo)',
+    recipientId: generateOpaqueId(),
+    recipientKeyId: generateOpaqueId(),
+    createdAt: at.toISOString(),
+    expiresAt: new Date(at.getTime() + 15 * 60_000).toISOString(),
+  }
+  const proof = {
+    type: 'EIP712',
+    chainId,
+    signature: await requester.signTypedData({
+      domain: requestDomain(chainId),
+      types: requestTypes,
+      primaryType: 'VerificationRequest',
+      message: requestMessage(fields),
+    }),
+  }
+  const result = await verify({ schemaVersion: '1.0.0', ...fields, proof }, shared, {
+    client: publicClient,
+    chainId,
+    attestationRegistry: attestationRegistry.address,
+    trustedIssuers: [record.issuerId],
+    answered,
+    now: () => at,
+  })
+  const checks = Object.entries(result.checks).map(([name, outcome]) => `${name} ${outcome}`)
+  console.log(`Requester verdict: ${result.verdict} (${checks.join(', ')})`)
+  return result.verdict
+}
+assert.equal(await requesterVerifies(), 'authentic')
 
 if (process.env.KEEP !== '1') {
   await step('Attestation revoked', attestationRegistry.write.revoke([content.attestationId]))
-  assert.equal(await status(), 'revoked', 'status after revocation')
-  console.log('Status: revoked')
+  assert.equal(await requesterVerifies(), 'revoked')
 }
