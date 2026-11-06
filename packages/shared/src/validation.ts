@@ -150,5 +150,9 @@ export function parseContract<K extends ContractName>(name: K, value: unknown): 
       throw new TypeError('Invalid grant chronology')
     }
   }
+  if (name === 'AttestationRecord') {
+    const a = value as DataContracts['AttestationRecord']
+    if (a.expiresAt <= a.issuedAt) throw new TypeError('Invalid attestation chronology')
+  }
   return structuredClone(value) as DataContracts[K]
 }

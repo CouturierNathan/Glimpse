@@ -62,5 +62,27 @@
       "status": "active"
     },
     "unexpectedPlaintext": "DO NOT STORE"
+  },
+  "AttestationRecord": {
+    "schemaVersion": "1.0.0",
+    "attestationId": "1b5137dacf766fc4115d56f9bbedff0f",
+    "issuerId": "1cfa517512b8adef14a10b0a3a8625b8",
+    "holder": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "attribute": "student_status",
+    "value": {
+      "type": "boolean",
+      "value": true
+    },
+    "issuedAt": "2026-11-05T16:36:50.000Z",
+    "expiresAt": "2027-05-04T16:36:50.000Z",
+    "salt": "0xbe05199b8a41b5309765810ac6b6ae052c4a4db06f152eef9100aafac05d4a07",
+    "commitment": "0xedc5d608a1144ecca08cd1922ed7aabe9ce6f95d45d9676648d8be408f193274",
+    "proof": {
+      "type": "EIP712",
+      "chainId": 31337,
+      "verifyingContract": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "signature": "0xbfa99552b431ec793d70f532c6328cc115b6fe2abb1b6f84bdb8687373762ba6206831b4c90678b854f85970855a9d6a04ae40858e9d319201f803bb5b1c12811c"
+    },
+    "holderName": "DO NOT STORE"
   }
 }
