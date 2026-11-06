@@ -1,9 +1,12 @@
-// Mid-term demo: an issuer signs an attestation, it is anchored, read back, checked, then revoked.
+// Mid-term demo (#20): an issuer signs an attestation, the holder's vault encrypts it, it is
+// anchored, then read back, decrypted and checked against the chain, then revoked.
 // Run: npm run demo -w contracts [-- --network baseSepolia]. KEEP=1 skips the revocation.
 /* eslint-disable no-console -- a CLI demo: its printed steps are the output */
 import assert from 'node:assert/strict'
 import { network } from 'hardhat'
 import { getAddress, verifyTypedData, type Address, type Hash } from 'viem'
+import { parseContract, type ExtractedClaim } from '@glimpse/shared'
+import { decryptItem, encryptItem, generateEncryptionKeys, generateOpaqueId } from '@glimpse/vault'
 import GlimpseModule from '../ignition/modules/Glimpse.ts'
 import {
   attestationCommitment,
@@ -64,6 +67,45 @@ const signature = await issuer.signTypedData({
   primaryType: 'Attestation',
   message,
 })
+const iso = (seconds: bigint) => new Date(Number(seconds) * 1000).toISOString()
+const record = parseContract('AttestationRecord', {
+  schemaVersion: '1.0.0',
+  attestationId: content.attestationId.slice(2),
+  issuerId: issuerId.slice(2),
+  holder: content.holder,
+  attribute: content.attribute,
+  value: content.value,
+  issuedAt: iso(message.issuedAt),
+  expiresAt: iso(message.expiresAt),
+  salt: content.salt,
+  commitment: message.commitment,
+  proof: { type: 'EIP712', chainId, verifyingContract: domain.verifyingContract, signature },
+})
+console.log('Attestation signed by the issuer (EIP-712)')
+
+// B's vault encrypts claims, so the class C claim is what gets encrypted; the record's salt and
+// proof stay in the holder's client memory in this demo.
+const holderKeys = await generateEncryptionKeys(generateOpaqueId())
+const claim: ExtractedClaim = {
+  schemaVersion: '1.0.0',
+  claimId: generateOpaqueId(),
+  attribute: record.attribute,
+  value: record.value,
+  period: { start: record.issuedAt.slice(0, 10), end: record.expiresAt.slice(0, 10) },
+  document: {
+    documentId: record.attestationId,
+    documentVersion: 1,
+    provenance: { class: 'C', attestationId: record.attestationId, issuerId: record.issuerId },
+  },
+  pages: [1],
+  confidence: 1,
+}
+const item = { itemId: generateOpaqueId(), itemVersion: 1, grantId: generateOpaqueId() }
+const vault = await encryptItem(claim, claim.document, holderKeys, item)
+console.log(
+  `Encrypted in the holder's vault: AES-256-GCM item, RSA-OAEP-256 key envelope (${vault.record.ciphertext.length} base64url chars)`,
+)
+
 await step(
   'Attestation anchored',
   attestationRegistry.write.anchor([
@@ -76,10 +118,19 @@ await step(
   ]),
 )
 
-// Read back from chain and check it the way a requester would, without trusting this script.
+// Read back from chain and the vault, and check it the way a requester would.
 const anchor = await attestationRegistry.read.getAnchor([content.attestationId])
 const { signer } = await issuerRegistry.read.getIssuer([anchor.issuerId])
-assert.equal(anchor.commitment, attestationCommitment(content), 'commitment matches content')
+const opened = await decryptItem(vault.record, vault.envelope, holderKeys, {
+  ...item,
+  keyId: vault.record.keyId,
+  sourceClass: 'C',
+})
+assert.equal(
+  anchor.commitment,
+  attestationCommitment({ ...content, attribute: opened.attribute, value: opened.value }),
+  'decrypted claim matches the anchored commitment',
+)
 assert.equal(anchor.signer, signer, 'anchored by the issuer current signer')
 assert.ok(
   await verifyTypedData({
@@ -93,29 +144,9 @@ assert.ok(
   'issuer signature',
 )
 console.log(
-  `Read back: ${STATUS[await attestationRegistry.read.statusOf([content.attestationId])]}`,
+  `Read back and decrypted: ${opened.attribute} = ${JSON.stringify(opened.value.value)}, commitment and issuer signature match, status ${STATUS[await attestationRegistry.read.statusOf([content.attestationId])]}`,
 )
-
-const iso = (seconds: bigint) => new Date(Number(seconds) * 1000).toISOString()
-console.log(
-  JSON.stringify(
-    {
-      schemaVersion: '1.0.0',
-      attestationId: content.attestationId.slice(2),
-      issuerId: issuerId.slice(2),
-      holder: content.holder,
-      attribute: content.attribute,
-      value: content.value,
-      issuedAt: iso(message.issuedAt),
-      expiresAt: iso(message.expiresAt),
-      salt: content.salt,
-      commitment: message.commitment,
-      proof: { type: 'EIP712', chainId, verifyingContract: domain.verifyingContract, signature },
-    },
-    null,
-    2,
-  ),
-)
+console.log(JSON.stringify(record, null, 2))
 
 if (process.env.KEEP !== '1') {
   await step('Attestation revoked', attestationRegistry.write.revoke([content.attestationId]))
