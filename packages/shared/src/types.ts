@@ -98,10 +98,71 @@ export interface AttestationRecord {
 }
 /** AttestationRegistry.statusOf, read live from chain; never stored in the record. */
 export type RevocationStatus = 'unknown' | 'active' | 'expired' | 'revoked'
+/**
+ * One IssuerRegistry entry (getIssuer), public. Registration is open and grants no trust:
+ * each requester keeps its own list of the issuerIds it accepts.
+ */
+export interface IssuerRegistryEntry {
+  schemaVersion: '1.0.0'
+  issuerId: OpaqueId
+  /** Manages the entry and rotates the signer. */
+  admin: Address
+  /** Current attestation signing key; an attestation is checked against the signer anchored with it. */
+  signer: Address
+  /** Public organisation metadata (name, website); never holder data. */
+  metadataURI: string
+  chainId: number
+  /** IssuerRegistry contract the entry was read from. */
+  registry: Address
+}
+/**
+ * Signed by the requester's key over the EIP-712 struct VerificationRequest(bytes16 requestId,
+ * address requester, string attribute, string purpose, bytes16 recipientId, bytes16 recipientKeyId,
+ * uint64 createdAt, uint64 expiresAt) in the domain { name: 'Glimpse', version: '1', chainId }.
+ * requestId is the nonce: random, answered once. Times are whole seconds.
+ */
+export interface VerificationRequest {
+  schemaVersion: '1.0.0'
+  requestId: OpaqueId
+  requester: Address
+  attribute: string
+  /** Shown to the holder before consent. */
+  purpose: string
+  /** Who receives the item: the key envelope is wrapped for this recipient key. */
+  recipientId: OpaqueId
+  recipientKeyId: OpaqueId
+  createdAt: string
+  expiresAt: string
+  proof: { type: 'EIP712'; chainId: number; signature: Hex }
+}
+export type CheckOutcome = 'pass' | 'fail' | 'unknown'
+/** Computed by the requester's own verifier from the chain, never taken from a Glimpse server. */
+export interface VerificationResult {
+  schemaVersion: '1.0.0'
+  requestId: OpaqueId
+  /** Both absent when the shared item is a declaration (class A or B), not an attestation. */
+  attestationId?: OpaqueId
+  issuerId?: OpaqueId
+  verdict: 'authentic' | 'declared' | 'expired' | 'revoked' | 'undetermined'
+  checks: {
+    signature: CheckOutcome
+    provenance: CheckOutcome
+    integrity: CheckOutcome
+    validity: CheckOutcome
+    revocation: CheckOutcome
+    replay: CheckOutcome
+  }
+  /** The requester's own trust policy for this issuer, separate from authenticity. */
+  issuerTrusted: boolean
+  checkedAt: string
+}
 export interface DataContracts {
   ExtractedClaim: ExtractedClaim
   EncryptedRecord: EncryptedRecord
   KeyEnvelope: KeyEnvelope
   ShareGrant: ShareGrant
   AttestationRecord: AttestationRecord
+  IssuerRegistryEntry: IssuerRegistryEntry
+  VerificationRequest: VerificationRequest
+  VerificationResult: VerificationResult
 }
