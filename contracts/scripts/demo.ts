@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict'
 import { network } from 'hardhat'
 import { getAddress, verifyTypedData, type Address, type Hash } from 'viem'
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import { parseContract, type ExtractedClaim } from '@glimpse/shared'
 import { decryptItem, encryptItem, generateEncryptionKeys, generateOpaqueId } from '@glimpse/vault'
 import GlimpseModule from '../ignition/modules/Glimpse.ts'
@@ -47,7 +48,10 @@ await step(
 const content: AttestationContent = {
   salt: randomBytes(32),
   attestationId: randomBytes(16),
-  holder: getAddress((process.env.HOLDER ?? issuer.account.address) as Address),
+  // The holder signs nothing here, so a fresh address stands in for their wallet.
+  holder: getAddress(
+    (process.env.HOLDER ?? privateKeyToAccount(generatePrivateKey()).address) as Address,
+  ),
   attribute: 'student_status',
   value: { type: 'boolean', value: true },
 }
@@ -143,12 +147,15 @@ assert.ok(
   }),
   'issuer signature',
 )
+const status = async () => STATUS[await attestationRegistry.read.statusOf([content.attestationId])]
+assert.equal(await status(), 'active', 'live status')
 console.log(
-  `Read back and decrypted: ${opened.attribute} = ${JSON.stringify(opened.value.value)}, commitment and issuer signature match, status ${STATUS[await attestationRegistry.read.statusOf([content.attestationId])]}`,
+  `Read back and decrypted: ${opened.attribute} = ${JSON.stringify(opened.value.value)}, commitment, issuer signature and status active match`,
 )
 console.log(JSON.stringify(record, null, 2))
 
 if (process.env.KEEP !== '1') {
   await step('Attestation revoked', attestationRegistry.write.revoke([content.attestationId]))
-  console.log(`Status: ${STATUS[await attestationRegistry.read.statusOf([content.attestationId])]}`)
+  assert.equal(await status(), 'revoked', 'status after revocation')
+  console.log('Status: revoked')
 }
