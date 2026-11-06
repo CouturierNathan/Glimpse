@@ -90,7 +90,7 @@ ShareGrant or successful `assertShareBinding` is never sufficient authorization.
 A should review IDs/consent linkage, grant lifecycle and plaintext isolation.
 These are contract requirements for review, not a competing AccessDecision type.
 
-**C — AttestationRecord** (#14). The plaintext of a class C item: B encrypts the whole
+**C: AttestationRecord** (#14). The plaintext of a class C item: B encrypts the whole
 record as an EncryptedRecord with `sourceClass: "C"`, and a class C Provenance points
 back to it by `attestationId` and `issuerId`. Fields: opaque `attestationId` and
 `issuerId` (the chain's `bytes16`), `holder` (wallet address, the pseudonym A's SIWE
@@ -111,6 +111,27 @@ signature) are 0x hex, the encoding every EVM tool reads.
   (`unknown`, `active`, `expired`, `revoked`), never stored in the record.
 - The valid fixture is a real signature by Hardhat's public test account #0 on chain
   31337, so a verifier can check it offline.
+
+**C: IssuerRegistryEntry** (#15). One entry of the on-chain `IssuerRegistry`, as
+`getIssuer` returns it, plus the `chainId` and `registry` address it was read from:
+`issuerId`, `admin` (manages the entry, rotates the signer), current `signer` and a public
+`metadataURI` (`https:`, `ipfs:` or `data:`). Registration is open and grants no trust.
+
+**C: VerificationRequest** (#17). What a requester asks a holder for: `attribute`,
+`purpose` (shown before consent), the recipient (`recipientId`, `recipientKeyId`: the key
+envelope is wrapped for that key), `createdAt` and `expiresAt` (whole seconds). `requestId`
+is the nonce: random, answered once. The requester signs the EIP-712 struct
+`VerificationRequest(bytes16 requestId, address requester, string attribute, string purpose, bytes16 recipientId, bytes16 recipientKeyId, uint64 createdAt, uint64 expiresAt)`
+in the domain `{ name: "Glimpse", version: "1", chainId }`. The valid fixture is signed by
+Hardhat's public test account #2.
+
+**C: VerificationResult** (#17). Computed by the requester's own verifier from the chain:
+`verdict` is `authentic`, `declared`, `expired`, `revoked` or `undetermined` (doc §8), and
+each of the six checks (signature, provenance, integrity, validity, revocation, replay) is
+`pass`, `fail` or `unknown`. A `declared` item (class A or B) has no `attestationId` or
+`issuerId`; any other verdict has both; `authentic` needs every check to pass.
+`issuerTrusted` is the requester's own policy, kept apart from authenticity. `checkedAt` is in
+whole seconds.
 
 Both poles must agree on the RSA recipient key registry and binding profile before
 crypto integration; this PR defines wire contracts, not a key service or encryption
