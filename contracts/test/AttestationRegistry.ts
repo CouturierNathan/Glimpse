@@ -8,7 +8,7 @@ import {
   attestationTypes,
   randomBytes,
   type AttestationContent,
-} from '../attestation.ts'
+} from '@glimpse/verifier'
 
 const YEAR = 365 * 24 * 60 * 60
 const Status = { Unknown: 0, Active: 1, Expired: 2, Revoked: 3 }
