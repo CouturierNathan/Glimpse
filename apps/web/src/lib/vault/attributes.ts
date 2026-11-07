@@ -1,3 +1,5 @@
+import { type DocumentUploadRequest, parseContract } from '@glimpse/shared'
+
 /** Attributes the import screen can extract. Shared by the browser form and the server. */
 export interface ImportAttribute {
   attribute: string
@@ -24,4 +26,25 @@ export type DocumentKind = (typeof documentKinds)[number]['kind']
 
 export function attributeName(attribute: string): string {
   return importAttributes.find((a) => a.attribute === attribute)?.name ?? attribute
+}
+
+/** The media type the upload is read as: a PDF by type or extension, UTF-8 text otherwise. */
+export function uploadMediaType(file: {
+  type: string
+  name: string
+}): DocumentUploadRequest['mediaType'] {
+  return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+    ? 'application/pdf'
+    : 'text/plain'
+}
+
+/** An upload request naming only attributes this app can extract, or `null`. */
+export function readUploadRequest(input: unknown): DocumentUploadRequest | null {
+  try {
+    const upload = parseContract('DocumentUploadRequest', input)
+    const known = new Set(importAttributes.map((a) => a.attribute))
+    return upload.attributes.every((a) => known.has(a)) ? upload : null
+  } catch {
+    return null
+  }
 }
