@@ -1,5 +1,18 @@
 {
   "name": "@glimpse/shared",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "version": "0.1.0",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./schemas/v1/*": "./schemas/v1/*",
+    "./fixtures/v1/*": "./fixtures/v1/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "npm run typecheck && node --test src/*.test.ts"
+  }
 }
