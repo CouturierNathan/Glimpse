@@ -1,3 +1,4 @@
+import { fingerprintRecord, assertRecordFingerprint } from './integrity.ts'
 import {
   assertClaimProvenance,
   envelopeLabel,
@@ -10,6 +11,8 @@ import type {
   ExtractedClaim,
   KeyEnvelope,
   OpaqueId,
+  AttestationRecord,
+  ShareGrant,
 } from '@glimpse/shared'
 
 export interface PublicRecipient {
@@ -30,8 +33,11 @@ export interface EncryptOptions {
   grantId: OpaqueId
 }
 export type EnvelopeExpectation = Pick<KeyEnvelope, 'itemId' | 'itemVersion' | 'keyId' | 'grantId'>
-export type ItemExpectation = EnvelopeExpectation & Pick<EncryptedRecord, 'sourceClass'>
+export type ItemExpectation = EnvelopeExpectation &
+  Pick<EncryptedRecord, 'sourceClass'> & { recordDigest: string }
 export interface EncryptedItem {
+  /** Creation-time client pin. Never replace it with a digest supplied by storage. */
+  recordDigest: string
   record: EncryptedRecord
   envelope: KeyEnvelope
 }
@@ -124,9 +130,25 @@ export async function encryptItem(
 ): Promise<EncryptedItem> {
   const claim = parseContract('ExtractedClaim', input)
   assertClaimProvenance(claim, trustedSource)
+  return encryptPayload(claim, claim.document.provenance.class, recipient, options)
+}
+/** C owns signature verification; this preserves the entire signed record inside ciphertext. */
+export async function encryptAttestation(
+  input: unknown,
+  recipient: PublicRecipient,
+  options: EncryptOptions,
+): Promise<EncryptedItem> {
+  return encryptPayload(parseContract('AttestationRecord', input), 'C', recipient, options)
+}
+async function encryptPayload(
+  claim: ExtractedClaim | AttestationRecord,
+  sourceClass: EncryptedRecord['sourceClass'],
+  recipient: PublicRecipient,
+  options: EncryptOptions,
+): Promise<EncryptedItem> {
   const holder = { ...recipient }
   assertRsaKey(holder.publicKey, 'public', 'wrapKey')
-  const record = recordHeader(options, claim.document.provenance.class)
+  const record = recordHeader(options, sourceClass)
   const envelope = parseContract('KeyEnvelope', {
     schemaVersion: '1.0.0',
     envelopeId: generateOpaqueId(),
@@ -138,7 +160,9 @@ export async function encryptItem(
     grantId: options.grantId,
     algorithm: 'RSA-OAEP-256',
     wrappedKey: encode(
-      new Uint8Array((holder.publicKey.algorithm as RsaHashedKeyAlgorithm).modulusLength / 8),
+      new Uint8Array(
+        Math.ceil((holder.publicKey.algorithm as RsaHashedKeyAlgorithm).modulusLength / 8),
+      ),
     ),
     labelVersion: '1',
   })
@@ -164,8 +188,13 @@ export async function encryptItem(
       name: 'RSA-OAEP',
       label: new Uint8Array(envelopeLabel(envelope)),
     })
+    const finalRecord = parseContract('EncryptedRecord', {
+      ...record,
+      ciphertext: encode(ciphertext),
+    })
     return {
-      record: parseContract('EncryptedRecord', { ...record, ciphertext: encode(ciphertext) }),
+      recordDigest: await fingerprintRecord(finalRecord),
+      record: finalRecord,
       envelope: parseContract('KeyEnvelope', { ...envelope, wrappedKey: encode(wrappedKey) }),
     }
   } finally {
@@ -194,6 +223,14 @@ export async function openEnvelope(
   recipient: PrivateRecipient,
   expected: EnvelopeExpectation,
 ): Promise<CryptoKey> {
+  return unwrapEnvelope(input, recipient, expected, false)
+}
+async function unwrapEnvelope(
+  input: unknown,
+  recipient: PrivateRecipient,
+  expected: EnvelopeExpectation,
+  extractable: boolean,
+): Promise<CryptoKey> {
   const envelope = parseContract('KeyEnvelope', input)
   const holder = { ...recipient }
   assertRsaKey(holder.privateKey, 'private', 'unwrapKey')
@@ -201,7 +238,7 @@ export async function openEnvelope(
   const wrapped = decode(envelope.wrappedKey)
   if (
     wrapped.byteLength !==
-    (holder.privateKey.algorithm as RsaHashedKeyAlgorithm).modulusLength / 8
+    Math.ceil((holder.privateKey.algorithm as RsaHashedKeyAlgorithm).modulusLength / 8)
   ) {
     throw new TypeError('Invalid wrapped key length')
   }
@@ -211,7 +248,7 @@ export async function openEnvelope(
     holder.privateKey,
     { name: 'RSA-OAEP', label: new Uint8Array(envelopeLabel(envelope)) },
     { name: 'AES-GCM', length: 256 },
-    false,
+    extractable,
     ['decrypt'],
   )
   if ((key.algorithm as AesKeyAlgorithm).length !== 256) {
@@ -226,8 +263,34 @@ export async function decryptItem(
   recipient: PrivateRecipient,
   expected: ItemExpectation,
 ): Promise<ExtractedClaim> {
+  const value = await decryptPayload(recordInput, envelopeInput, recipient, expected)
+  const claim = parseContract('ExtractedClaim', value)
+  if (claim.document.provenance.class !== expected.sourceClass) {
+    throw new Error('Source class mismatch')
+  }
+  return claim
+}
+export async function decryptAttestation(
+  recordInput: unknown,
+  envelopeInput: unknown,
+  recipient: PrivateRecipient,
+  expected: ItemExpectation,
+): Promise<AttestationRecord> {
+  if (expected.sourceClass !== 'C') throw new Error('Source class mismatch')
+  return parseContract(
+    'AttestationRecord',
+    await decryptPayload(recordInput, envelopeInput, recipient, expected),
+  )
+}
+async function decryptPayload(
+  recordInput: unknown,
+  envelopeInput: unknown,
+  recipient: PrivateRecipient,
+  expected: ItemExpectation,
+): Promise<unknown> {
   const record = parseContract('EncryptedRecord', recordInput)
   const context = { ...expected }
+  await assertRecordFingerprint(record, context.recordDigest)
   if (
     record.itemId !== context.itemId ||
     record.itemVersion !== context.itemVersion ||
@@ -256,12 +319,75 @@ export async function decryptItem(
     } catch {
       throw new TypeError('Invalid encrypted claim payload')
     }
-    const claim = parseContract('ExtractedClaim', value)
-    if (claim.document.provenance.class !== record.sourceClass) {
-      throw new Error('Source class mismatch')
-    }
-    return claim
+    return value
   } finally {
     plaintext.fill(0)
   }
 }
+
+/** Client operation after server consent authorization. Does not export raw/private keys. */
+export async function wrapForRequester(
+  recordInput: unknown,
+  ownerEnvelope: unknown,
+  holder: PrivateRecipient,
+  expected: ItemExpectation,
+  grantInput: unknown,
+  recipient: PublicRecipient,
+): Promise<KeyEnvelope> {
+  const grant = parseContract('ShareGrant', grantInput)
+  const record = parseContract('EncryptedRecord', recordInput)
+  assertLiveGrant(grant)
+  if (
+    grant.holderId !== holder.recipientId ||
+    grant.recipientId !== recipient.recipientId ||
+    grant.itemId !== record.itemId ||
+    grant.itemVersion !== record.itemVersion
+  ) {
+    throw new Error('Grant binding mismatch')
+  }
+  assertRsaKey(recipient.publicKey, 'public', 'wrapKey')
+  // Authenticate the ciphertext before rewrapping, then retain extractability only in this scope.
+  await decryptPayload(record, ownerEnvelope, holder, expected)
+  const key = await unwrapEnvelope(ownerEnvelope, holder, expected, true)
+  const envelope = parseContract('KeyEnvelope', {
+    schemaVersion: '1.0.0',
+    envelopeId: generateOpaqueId(),
+    itemId: record.itemId,
+    itemVersion: record.itemVersion,
+    keyId: record.keyId,
+    recipientId: recipient.recipientId,
+    recipientKeyId: recipient.recipientKeyId,
+    grantId: grant.grantId,
+    algorithm: 'RSA-OAEP-256',
+    wrappedKey: encode(
+      new Uint8Array(
+        Math.ceil((recipient.publicKey.algorithm as RsaHashedKeyAlgorithm).modulusLength / 8),
+      ),
+    ),
+    labelVersion: '1',
+  })
+  const wrappedKey = await cryptoApi().subtle.wrapKey('raw', key, recipient.publicKey, {
+    name: 'RSA-OAEP',
+    label: new Uint8Array(envelopeLabel(envelope)),
+  })
+  assertLiveGrant(grant)
+  return parseContract('KeyEnvelope', { ...envelope, wrappedKey: encode(wrappedKey) })
+}
+export function assertLiveGrant(grant: ShareGrant, now = Date.now()): void {
+  if (
+    grant.revocation.status !== 'active' ||
+    now < Date.parse(grant.createdAt) ||
+    now >= Date.parse(grant.expiresAt)
+  ) {
+    throw new Error('Grant inactive')
+  }
+}
+
+export {
+  fingerprintRecord,
+  fingerprintBytes,
+  packEncryptedItem,
+  verifyEncryptedItem,
+  IntegrityError,
+} from './integrity.ts'
+export type { PackedItem } from './integrity.ts'
