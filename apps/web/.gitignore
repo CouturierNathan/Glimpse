@@ -1,0 +1,2 @@
+# Local encrypted vault objects written by the dev server. Never commit them.
+.vault-data/
