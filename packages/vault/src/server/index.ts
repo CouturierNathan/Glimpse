@@ -24,3 +24,5 @@ export {
 export type { TextPage, AttributeSpec, ExtractionDocument, ExtractionModel } from './extraction.ts'
 export { createOllamaModel } from './ollama.ts'
 export { withPdfPages } from './pdf.ts'
+export { createPrivateExtractionService, EXTRACTION_POLICY_VERSION } from './privacy.ts'
+export type { ExtractionConsent } from './privacy.ts'

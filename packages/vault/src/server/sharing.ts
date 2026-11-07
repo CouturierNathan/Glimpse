@@ -35,7 +35,8 @@ export function createShareService(options: {
 }) {
   async function auth() {
     const h = await options.authenticate()
-    if (!h || h.expiresAt <= Date.now()) throw new StorageError('UNAUTHENTICATED')
+    if (!h || !Number.isSafeInteger(h.expiresAt) || h.expiresAt <= Date.now())
+      throw new StorageError('UNAUTHENTICATED')
     assertHolderId(h.holderId)
     if (!Array.isArray(h.encryptionKeyIds) || !h.encryptionKeyIds.length) {
       throw new StorageError('UNAUTHENTICATED')
