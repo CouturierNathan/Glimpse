@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import type { VerificationRequest } from '@glimpse/shared'
+import { parseContract, type VerificationRequest } from '@glimpse/shared'
 import { requestDomain, requestMessage, requestTypes } from '@glimpse/verifier'
 import { privateKeyToAccount } from 'viem/accounts'
 
-import { RequestError, RequestStore, validateRequest } from './requests.ts'
+import { RequestError, RequestStore, toConsentDecision, validateRequest } from './requests.ts'
 
 // Hardhat's first two well-known test accounts: public, never funded on a real chain.
 const requester = privateKeyToAccount(
@@ -119,6 +119,9 @@ test('a holder answers a request once', async () => {
     consentRequestId: request.requestId,
     expiresAt: request.expiresAt,
   })
+  const decision = store.get(request.requestId, NOW)?.decision
+  assert.deepEqual(parseContract('AccessDecision', decision), decision)
+  assert.equal(decision?.decidedAt, new Date(NOW).toISOString())
   assert.throws(
     () => store.decide(request.requestId, 'e'.repeat(32), { outcome: 'deny' }, NOW),
     RequestError,
@@ -131,6 +134,9 @@ test('a refused or withdrawn request yields no decision', async () => {
   store.add(refused)
   store.decide(refused.requestId, 'e'.repeat(32), { outcome: 'deny' }, NOW)
   assert.equal(store.readDecision(refused.requestId), null)
+  const refusal = store.get(refused.requestId, NOW)?.decision
+  assert.equal(refusal?.reason, 'holder-refused')
+  assert.equal(refusal && toConsentDecision(refusal), null)
 
   const withdrawn = await signedRequest({ requestId: '2'.repeat(32) })
   store.add(withdrawn)
@@ -140,8 +146,19 @@ test('a refused or withdrawn request yields no decision', async () => {
     { outcome: 'allow', itemId: 'f'.repeat(32), itemVersion: 1 },
     NOW,
   )
-  store.withdraw(withdrawn.requestId)
+  store.withdraw(withdrawn.requestId, NOW)
   assert.equal(store.readDecision(withdrawn.requestId), null)
+  assert.deepEqual(store.get(withdrawn.requestId, NOW)?.decision, {
+    schemaVersion: '1.0.0',
+    outcome: 'deny',
+    reason: 'consent-withdrawn',
+    holderId: 'e'.repeat(32),
+    consentRequestId: withdrawn.requestId,
+    recipientId,
+    recipientKeyId,
+    decidedAt: new Date(NOW).toISOString(),
+    expiresAt: withdrawn.expiresAt,
+  })
 })
 
 test('a pending request past its end date expires and cannot be answered', async () => {

@@ -6,9 +6,11 @@ import { createSessionToken, getSessionSecret, readSessionToken, type Session } 
 const secret = 'test-secret-that-is-at-least-32-bytes-long'
 const now = 1_800_000_000_000
 const session: Session = {
+  schemaVersion: '1.0.0',
   address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
   chainId: 11155111,
-  expiresAt: now + 60_000,
+  issuedAt: new Date(now).toISOString(),
+  expiresAt: new Date(now + 60_000).toISOString(),
 }
 
 describe('session tokens', () => {
@@ -32,7 +34,7 @@ describe('session tokens', () => {
 
   test('reject an expired session', () => {
     const token = createSessionToken(session, secret)
-    assert.equal(readSessionToken(token, secret, session.expiresAt), null)
+    assert.equal(readSessionToken(token, secret, Date.parse(session.expiresAt)), null)
   })
 
   test('reject malformed tokens', () => {
@@ -41,10 +43,15 @@ describe('session tokens', () => {
     }
   })
 
-  test('reject a well-signed payload that is not a session', () => {
-    const payload = Buffer.from(JSON.stringify({ address: 'nope' })).toString('base64url')
-    const token = createSessionToken(session, secret).replace(/^[^.]+/, payload)
-    assert.equal(readSessionToken(token, secret, now), null)
+  test('reject a well-signed payload that is not an AuthSession', () => {
+    for (const data of [
+      { address: 'nope' },
+      { ...session, schemaVersion: undefined },
+      { ...session, expiresAt: Date.parse(session.expiresAt) },
+    ]) {
+      const token = createSessionToken(data as unknown as Session, secret)
+      assert.equal(readSessionToken(token, secret, now), null)
+    }
   })
 })
 

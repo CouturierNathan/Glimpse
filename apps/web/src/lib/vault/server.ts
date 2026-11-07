@@ -56,7 +56,7 @@ async function backend(): Promise<StorageBackend> {
 export function holderOf(session: Session): AuthenticatedHolder | null {
   const identity = holders.find(session.address, session.chainId)
   if (!identity) return null
-  return { ...identity, expiresAt: session.expiresAt }
+  return { ...identity, expiresAt: Date.parse(session.expiresAt) }
 }
 
 /** The request's holder, or the response that tells the browser what to do about it. */

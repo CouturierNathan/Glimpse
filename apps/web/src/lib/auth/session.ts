@@ -1,18 +1,14 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
-import { type Address, getAddress, isAddress } from 'viem'
+import { type AuthSession, parseContract } from '@glimpse/shared'
+import { getAddress } from 'viem'
 
 export const SESSION_COOKIE = 'glimpse_session'
 export const SESSION_TTL_MS = 8 * 60 * 60 * 1000
 
 const MIN_SECRET_BYTES = 32
 
-export interface Session {
-  address: Address
-  chainId: number
-  /** Unix time in milliseconds. */
-  expiresAt: number
-}
+export type Session = AuthSession
 
 /** Reads the HMAC key for session cookies. It lives in the environment, never in the repo. */
 export function getSessionSecret(): string {
@@ -49,23 +45,12 @@ export function readSessionToken(
   const given = Buffer.from(mac, 'base64url')
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null
 
-  let data: unknown
+  let session: Session
   try {
-    data = JSON.parse(Buffer.from(payload, 'base64url').toString())
+    session = parseContract('AuthSession', JSON.parse(Buffer.from(payload, 'base64url').toString()))
   } catch {
     return null
   }
-  if (!isSession(data) || data.expiresAt <= now) return null
-  return { address: getAddress(data.address), chainId: data.chainId, expiresAt: data.expiresAt }
-}
-
-function isSession(data: unknown): data is Session {
-  if (typeof data !== 'object' || data === null) return false
-  const { address, chainId, expiresAt } = data as Record<string, unknown>
-  return (
-    typeof address === 'string' &&
-    isAddress(address) &&
-    Number.isSafeInteger(chainId) &&
-    Number.isSafeInteger(expiresAt)
-  )
+  if (Date.parse(session.expiresAt) <= now) return null
+  return { ...session, address: getAddress(session.address) }
 }

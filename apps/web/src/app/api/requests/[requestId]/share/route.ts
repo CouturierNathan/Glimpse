@@ -35,7 +35,7 @@ export async function DELETE(_request: Request, { params }: Context) {
   const { requestId } = await params
   try {
     const stored = findRequest(requestId)
-    if (stored.holderId !== holder.holderId) {
+    if (stored.decision?.holderId !== holder.holderId) {
       throw new RequestError(403, 'Only the holder who answered can withdraw.')
     }
     if (stored.shareReference) await (await shareService()).revoke(stored.shareReference)

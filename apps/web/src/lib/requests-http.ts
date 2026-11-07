@@ -34,7 +34,7 @@ export function requestView(stored: StoredRequest, session: Session, holderId: s
   const { request } = stored
   const role = isRequester(stored, session)
     ? 'requester'
-    : stored.holderId === holderId
+    : stored.decision?.holderId === holderId
       ? 'holder'
       : 'visitor'
   const open = stored.state === 'pending' || stored.state === 'expired'
