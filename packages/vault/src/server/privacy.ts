@@ -44,16 +44,18 @@ export function createPrivateExtractionService(options: {
     names: string[],
   ) {
     const h = await options.authenticate()
-    if (!h || !Number.isSafeInteger(h.expiresAt) || h.expiresAt <= Date.now())
+    if (!h || !Number.isSafeInteger(h.expiresAt) || h.expiresAt <= Date.now()) {
       throw new StorageError('UNAUTHENTICATED')
+    }
     assertHolderId(h.holderId)
     assertHolderId(document.documentId)
     if (
       !Number.isSafeInteger(document.documentVersion) ||
       document.documentVersion < 1 ||
       !Array.isArray(names)
-    )
+    ) {
       throw new ExtractionError()
+    }
     const c = await options.readConsent(h.holderId, document.documentId)
     if (
       !c ||
@@ -92,8 +94,9 @@ export function createPrivateExtractionService(options: {
       !Array.isArray(input.pages) ||
       input.pages.length > 12 ||
       input.pages.some((p) => !p || typeof p.text !== 'string' || p.text.length > 40_000)
-    )
+    ) {
       throw new ExtractionError()
+    }
     const document = structuredClone(input)
     const outputs: unknown[] = []
     try {
