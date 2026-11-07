@@ -151,7 +151,15 @@ test('Ollama adapter speaks the real HTTP protocol with bounded JSON and no redi
     assert.equal(_url, 'http://127.0.0.1:11434/api/chat')
     return fetch(`http://127.0.0.1:${address.port}`, init)
   })
-  assert.deepEqual(await model.complete('fixed policy', 'selected synthetic excerpt'), [])
+  const excerptData = JSON.stringify([
+    {
+      attribute: 'student_status',
+      type: 'boolean',
+      page: 1,
+      quote: 'Student: true; period 2026-01-01 to 2026-12-31',
+    },
+  ])
+  assert.deepEqual(await model.complete('fixed policy', excerptData), [])
   const request = JSON.parse(body) as {
     stream: boolean
     keep_alive: number
@@ -159,9 +167,9 @@ test('Ollama adapter speaks the real HTTP protocol with bounded JSON and no redi
   }
   assert.equal(request.stream, false)
   assert.equal(request.keep_alive, 0)
-  assert.equal(request.messages[1]?.content, 'selected synthetic excerpt')
+  assert.equal(request.messages[1]?.content, excerptData)
   mode = 'redirect'
-  await assert.rejects(model.complete('policy', 'excerpt'))
+  await assert.rejects(model.complete('policy', excerptData))
   mode = 'large'
-  await assert.rejects(model.complete('policy', 'excerpt'))
+  await assert.rejects(model.complete('policy', excerptData))
 })
