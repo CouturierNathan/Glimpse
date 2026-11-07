@@ -150,5 +150,24 @@ export function parseContract<K extends ContractName>(name: K, value: unknown): 
       throw new TypeError('Invalid grant chronology')
     }
   }
+  if (name === 'AttestationRecord') {
+    const a = value as DataContracts['AttestationRecord']
+    if (a.expiresAt <= a.issuedAt) throw new TypeError('Invalid attestation chronology')
+  }
+  if (name === 'VerificationRequest') {
+    const r = value as DataContracts['VerificationRequest']
+    if (r.expiresAt <= r.createdAt) throw new TypeError('Invalid request chronology')
+  }
+  if (name === 'VerificationResult') {
+    const r = value as DataContracts['VerificationResult']
+    const attestation = r.attestationId !== undefined
+    if (
+      attestation !== (r.issuerId !== undefined) ||
+      attestation === (r.verdict === 'declared') ||
+      (r.verdict === 'authentic' && Object.values(r.checks).some((c) => c !== 'pass'))
+    ) {
+      throw new TypeError('Incoherent verification result')
+    }
+  }
   return structuredClone(value) as DataContracts[K]
 }

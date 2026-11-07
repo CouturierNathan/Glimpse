@@ -58,5 +58,68 @@
     "revocation": {
       "status": "active"
     }
+  },
+  "AttestationRecord": {
+    "schemaVersion": "1.0.0",
+    "attestationId": "1b5137dacf766fc4115d56f9bbedff0f",
+    "issuerId": "1cfa517512b8adef14a10b0a3a8625b8",
+    "holder": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "attribute": "student_status",
+    "value": {
+      "type": "boolean",
+      "value": true
+    },
+    "issuedAt": "2026-11-05T16:36:50.000Z",
+    "expiresAt": "2027-05-04T16:36:50.000Z",
+    "salt": "0xbe05199b8a41b5309765810ac6b6ae052c4a4db06f152eef9100aafac05d4a07",
+    "commitment": "0xedc5d608a1144ecca08cd1922ed7aabe9ce6f95d45d9676648d8be408f193274",
+    "proof": {
+      "type": "EIP712",
+      "chainId": 31337,
+      "verifyingContract": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "signature": "0xbfa99552b431ec793d70f532c6328cc115b6fe2abb1b6f84bdb8687373762ba6206831b4c90678b854f85970855a9d6a04ae40858e9d319201f803bb5b1c12811c"
+    }
+  },
+  "IssuerRegistryEntry": {
+    "schemaVersion": "1.0.0",
+    "issuerId": "1cfa517512b8adef14a10b0a3a8625b8",
+    "admin": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "signer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "metadataURI": "data:application/json,{\"name\":\"Glimpse demo school (test issuer)\"}",
+    "chainId": 31337,
+    "registry": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  },
+  "VerificationRequest": {
+    "schemaVersion": "1.0.0",
+    "requestId": "3a8d94a8c3d6d328acabf476e5900ed1",
+    "requester": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+    "attribute": "student_status",
+    "purpose": "Student discount on a monthly transit pass",
+    "recipientId": "3006b0f9eefe11c0a39fd632969a2990",
+    "recipientKeyId": "fe7f4c9c8c0d5b0393f00b695369a77d",
+    "createdAt": "2026-11-06T10:00:00.000Z",
+    "expiresAt": "2026-11-06T10:15:00.000Z",
+    "proof": {
+      "type": "EIP712",
+      "chainId": 31337,
+      "signature": "0xa7db1b8f32829338aedf02d52d61f50a5fb52a1a3c82c003d2fe55d595da4f5626fb8333b12d676b5e81daeda5f3812eb81dfbc4e675d334ce7e9342492d0fdd1b"
+    }
+  },
+  "VerificationResult": {
+    "schemaVersion": "1.0.0",
+    "requestId": "3a8d94a8c3d6d328acabf476e5900ed1",
+    "attestationId": "1b5137dacf766fc4115d56f9bbedff0f",
+    "issuerId": "1cfa517512b8adef14a10b0a3a8625b8",
+    "verdict": "authentic",
+    "checks": {
+      "signature": "pass",
+      "provenance": "pass",
+      "integrity": "pass",
+      "validity": "pass",
+      "revocation": "pass",
+      "replay": "pass"
+    },
+    "issuerTrusted": true,
+    "checkedAt": "2026-11-06T10:05:00.000Z"
   }
 }
