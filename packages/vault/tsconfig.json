@@ -7,5 +7,5 @@
     "lib": ["ES2023", "DOM"],
     "erasableSyntaxOnly": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "scripts/**/*.ts"]
 }
