@@ -1,3 +1,4 @@
+import { schemas } from '@glimpse/shared'
 import { ExtractionError } from './extraction.ts'
 import type { ExtractionModel } from './extraction.ts'
 /** Loopback-only provider. No credentials, cloud URLs, redirects or document-selected endpoints. */
@@ -23,7 +24,7 @@ export function createOllamaModel(
               { role: 'system', content: system },
               { role: 'user', content: data },
             ],
-            format: 'json',
+            format: outputFormat(data),
             stream: false,
             keep_alive: 0,
             options: { temperature: 0, num_predict: 2048 },
@@ -67,6 +68,55 @@ export function createOllamaModel(
       } catch {
         throw new ExtractionError()
       }
+    },
+  }
+}
+
+function outputFormat(data: string) {
+  const excerpts = JSON.parse(data) as {
+    attribute: string
+    type: string
+    page: number
+    quote: string
+  }[]
+  if (!Array.isArray(excerpts) || excerpts.length < 1 || excerpts.length > 8) {
+    throw new ExtractionError()
+  }
+  return {
+    type: 'array',
+    minItems: excerpts.length,
+    maxItems: excerpts.length,
+    items: {
+      oneOf: excerpts.map((e) => {
+        if (
+          !e ||
+          typeof e.quote !== 'string' ||
+          e.quote.length > 600 ||
+          !['string', 'number', 'boolean', 'date'].includes(e.type)
+        ) {
+          throw new ExtractionError()
+        }
+        const dates = e.quote.match(/\b\d{4}-\d{2}-\d{2}\b/g)
+        if (dates?.length !== 2) throw new ExtractionError()
+        return {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            attribute: { type: 'string', const: e.attribute },
+            value: {
+              oneOf: schemas.ExtractedClaim.properties.value.oneOf.filter(
+                (v) => v.properties.type.const === e.type,
+              ),
+            },
+            start: { type: 'string', const: dates[0] },
+            end: { type: 'string', const: dates[1] },
+            page: { type: 'integer', const: e.page },
+            quote: { type: 'string', const: e.quote },
+            confidence: { type: 'number', minimum: 0, maximum: 1 },
+          },
+          required: ['attribute', 'value', 'start', 'end', 'page', 'quote', 'confidence'],
+        }
+      }),
     },
   }
 }
