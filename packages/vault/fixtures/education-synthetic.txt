@@ -1,0 +1,3 @@
+SYNTHETIC DEMO - no real identity or secret
+Student: true; period 2026-01-01 to 2026-12-31
+Score: 42; period 2026-01-01 to 2026-12-31
