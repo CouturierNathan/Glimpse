@@ -1,3 +1,4 @@
+import { fingerprintRecord } from '@glimpse/vault'
 import assert from 'node:assert/strict'
 import { before, test } from 'node:test'
 import { fixtures, parseContract, envelopeLabel, recordAdditionalData } from '@glimpse/shared'
@@ -23,6 +24,7 @@ const context = (data: EncryptedItem): ItemExpectation => ({
   keyId: data.record.keyId,
   sourceClass: data.record.sourceClass,
   grantId: data.envelope.grantId,
+  recordDigest: data.recordDigest,
 })
 const encode = (data: ArrayBuffer | Uint8Array): string =>
   Buffer.from(data instanceof Uint8Array ? data : new Uint8Array(data)).toString('base64url')
@@ -90,28 +92,28 @@ test('another recipient rejected, including real OAEP rejection with spoofed met
     name: 'OperationError',
   })
 })
-test('modified ciphertext, authentication tag or IV fails actual AES authentication', async () => {
+test('modified ciphertext, authentication tag or IV fails trusted fingerprint validation', async () => {
   for (const ciphertext of [
     flip(item.record.ciphertext),
     encode(Buffer.from(item.record.ciphertext, 'base64url').subarray(0, -1)),
   ]) {
     await assert.rejects(
       decryptItem({ ...item.record, ciphertext }, item.envelope, holder, expected),
-      { name: 'OperationError' },
+      { name: 'IntegrityError' },
     )
   }
   await assert.rejects(
     decryptItem({ ...item.record, iv: flip(item.record.iv) }, item.envelope, holder, expected),
-    { name: 'OperationError' },
+    { name: 'IntegrityError' },
   )
 })
-test('changed record source class fails GCM even with changed expected context', async () => {
+test('changed record source class fails trusted fingerprint validation', async () => {
   await assert.rejects(
     decryptItem({ ...item.record, sourceClass: 'B' }, item.envelope, holder, {
       ...expected,
       sourceClass: 'B',
     }),
-    { name: 'OperationError' },
+    { name: 'IntegrityError' },
   )
 })
 test('changed OAEP context is cryptographically rejected after structural checks', async () => {
@@ -252,13 +254,16 @@ test('authenticated but malformed plaintext and class mismatch rejected', async 
       ),
     }
     await assert.rejects(
-      decryptItem(record, envelope, holder, expected),
+      decryptItem(record, envelope, holder, {
+        ...expected,
+        recordDigest: await fingerprintRecord(record),
+      }),
       (error) => error instanceof Error && !error.message.includes('private malformed payload'),
     )
   }
 })
 test('metadata contains no claim plaintext; no keys escape encryptItem', () => {
-  assert.deepEqual(Object.keys(item).sort(), ['envelope', 'record'])
+  assert.deepEqual(Object.keys(item).sort(), ['envelope', 'record', 'recordDigest'])
   const json = JSON.stringify(item)
   for (const field of ['attribute', 'value', 'pages', 'documentId', 'privateKey', 'publicKey']) {
     assert.equal(json.includes(`"${field}"`), false)
