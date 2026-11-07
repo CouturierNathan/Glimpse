@@ -9,9 +9,10 @@ import { Providers } from '@/components/Providers.tsx'
 
 import './globals.css'
 
+// Variable font with its optical size axis, so the 80px hero gets the display cut, not the 14px one.
 const display = Bricolage_Grotesque({
   subsets: ['latin'],
-  weight: ['700'],
+  axes: ['opsz'],
   variable: '--font-display',
 })
 

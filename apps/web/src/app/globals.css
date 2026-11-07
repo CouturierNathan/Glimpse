@@ -53,9 +53,21 @@ h2,
 h3 {
   font-family: var(--font-display), system-ui, sans-serif;
   font-weight: 700;
+  font-optical-sizing: auto;
   letter-spacing: -0.02em;
   line-height: 1.1;
   margin: 0;
+}
+
+/* Small text reads better slightly open; large text is tightened per heading. */
+.address,
+.steps h2::before,
+.doc-head span,
+.doc-row dt,
+.doc-foot,
+.panel li span,
+.panel li::before {
+  letter-spacing: 0.01em;
 }
 
 a {
@@ -135,7 +147,8 @@ a {
   align-items: center;
   gap: 0.5rem;
   margin-left: auto;
-  min-height: 2.5rem;
+  /* Same height as the sign-in button, so the header does not jump once the session loads. */
+  min-height: 2.75rem;
 }
 
 .address {
@@ -568,6 +581,11 @@ a {
     gap: 1.5rem;
   }
 
+  /* At least 44px tall on touch screens. */
+  .nav a {
+    padding: 0.6rem 0;
+  }
+
   .doc {
     padding: 1.25rem;
   }
@@ -577,13 +595,36 @@ a {
   }
 }
 
+/* No sliding mask: the answer still appears, as a short cross-fade. */
 @media (prefers-reduced-motion: reduce) {
   .doc-row.revealed dd::after {
-    animation: none;
-    transform: scaleX(0);
+    animation-name: fade-out;
+    animation-duration: 300ms;
   }
 
   .button {
     transition: none;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --rule: var(--ink-soft);
+    --guilloche: transparent;
+  }
+
+  .doc,
+  .panel {
+    border-color: var(--ink);
   }
 }
