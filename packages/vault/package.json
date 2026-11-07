@@ -7,6 +7,20 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./server": {
+      "browser": null,
+      "node": {
+        "types": "./src/server/index.ts",
+        "default": "./src/server/index.ts"
+      }
+    },
+    "./server/testing": {
+      "browser": null,
+      "node": {
+        "types": "./src/server/testing.ts",
+        "default": "./src/server/testing.ts"
+      }
     }
   },
   "dependencies": {
@@ -14,6 +28,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.browser.json",
-    "test": "npm run typecheck && node --test src/*.test.ts"
+    "test": "npm run typecheck && node --test src/*.test.ts",
+    "demo": "node scripts/demo.ts"
   }
 }
