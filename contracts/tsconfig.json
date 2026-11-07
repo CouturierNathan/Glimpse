@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    // Tests destructure Hardhat's funded accounts by position; they always exist.
+    "noUncheckedIndexedAccess": false,
+    "types": ["node"]
+  },
+  "include": ["*.ts", "test/**/*.ts", "ignition/**/*.ts", "scripts/**/*.ts", "artifacts/**/*.d.ts"]
+}
