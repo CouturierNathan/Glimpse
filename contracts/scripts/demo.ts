@@ -129,6 +129,7 @@ const opened = await decryptItem(vault.record, vault.envelope, holderKeys, {
   ...item,
   keyId: vault.record.keyId,
   sourceClass: 'C',
+  recordDigest: vault.recordDigest,
 })
 assert.equal(
   anchor.commitment,
