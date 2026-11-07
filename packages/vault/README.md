@@ -28,7 +28,7 @@ const claim = parseContract('ExtractedClaim', fixtures.valid.ExtractedClaim)
 // Demo fixture only. In production, obtain this from the trusted upload/verifier,
 // independently of AI output. Class B/C evidence must first be verified by A/C.
 const trustedSource = claim.document
-const { record, envelope } = await encryptItem(claim, trustedSource, holder, {
+const { record, envelope, recordDigest } = await encryptItem(claim, trustedSource, holder, {
   itemId: generateOpaqueId(),
   itemVersion: 1,
   grantId: generateOpaqueId(),
@@ -41,8 +41,9 @@ const expected = {
   keyId: record.keyId,
   sourceClass: record.sourceClass,
   grantId: envelope.grantId,
+  recordDigest, // creation-time client pin, never a digest read from storage
 }
-// Only JSON.stringify({ record, envelope }) is eligible for server storage.
+// Upload packEncryptedItem({record,envelopes:[envelope]}).bytes via putBytes; retain its digest.
 // holder, claim, trustedSource and returned plaintext stay on the client.
 const plaintext = await decryptItem(record, envelope, holder, expected)
 // Optional lower-level operation: yields a non-exportable decrypt-only CryptoKey.
@@ -122,3 +123,24 @@ changed authenticated context, wrapped-key corruption, AES key length, provenanc
 malformed authenticated plaintext, and non-exportability. Browser DOM-only typechecking
 checks the client module without Node ambient types; cryptographic execution tests
 run on Node 24's Web Crypto implementation, not a browser automation suite.
+
+## Server storage
+
+The separate Node-only `@glimpse/vault/server` entry provides authenticated local
+object storage. See [STORAGE.md](./STORAGE.md) for configuration, A's SIWE integration
+boundary, C's opaque anchor reference and failure semantics. Never import this
+entry from browser components. The original encryption API remains browser-only
+in its intended use; storage does not provide durable private-key recovery.
+
+## Final review: trusted integrity pins
+
+Hybrid encryption does not authenticate its author: anyone possessing a public RSA key
+can encrypt a different internally consistent record. High-level decryptItem,
+decryptAttestation and wrapForRequester therefore now REQUIRE expected.recordDigest,
+returned by encryptItem/encryptAttestation at creation. It hashes the encrypted record,
+not a low-entropy personal value. Retain it independently on the client, or obtain it
+through an independently authenticated holder signature/commitment. Never recompute an
+expected pin from an untrusted download or trust a replacement pin supplied alongside it.
+For storage, packEncryptedItem returns exact encrypted bytes plus a separate digest;
+putBytes/getBytes preserve those bytes and verifyEncryptedItem checks the retained pin
+before parsing. Low-level openEnvelope alone does not establish record origin.
