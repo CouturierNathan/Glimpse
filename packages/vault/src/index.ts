@@ -254,8 +254,9 @@ export async function decryptItem(
 ): Promise<ExtractedClaim> {
   const value = await decryptPayload(recordInput, envelopeInput, recipient, expected)
   const claim = parseContract('ExtractedClaim', value)
-  if (claim.document.provenance.class !== expected.sourceClass)
+  if (claim.document.provenance.class !== expected.sourceClass) {
     throw new Error('Source class mismatch')
+  }
   return claim
 }
 export async function decryptAttestation(
@@ -329,8 +330,9 @@ export async function wrapForRequester(
     grant.recipientId !== recipient.recipientId ||
     grant.itemId !== record.itemId ||
     grant.itemVersion !== record.itemVersion
-  )
+  ) {
     throw new Error('Grant binding mismatch')
+  }
   assertRsaKey(recipient.publicKey, 'public', 'wrapKey')
   // Authenticate the ciphertext before rewrapping, then retain extractability only in this scope.
   await decryptPayload(record, ownerEnvelope, holder, expected)
@@ -362,6 +364,7 @@ export function assertLiveGrant(grant: ShareGrant, now = Date.now()): void {
     grant.revocation.status !== 'active' ||
     now < Date.parse(grant.createdAt) ||
     now >= Date.parse(grant.expiresAt)
-  )
+  ) {
     throw new Error('Grant inactive')
+  }
 }

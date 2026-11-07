@@ -37,8 +37,9 @@ export function createShareService(options: {
     const h = await options.authenticate()
     if (!h || h.expiresAt <= Date.now()) throw new StorageError('UNAUTHENTICATED')
     assertHolderId(h.holderId)
-    if (!Array.isArray(h.encryptionKeyIds) || !h.encryptionKeyIds.length)
+    if (!Array.isArray(h.encryptionKeyIds) || !h.encryptionKeyIds.length) {
       throw new StorageError('UNAUTHENTICATED')
+    }
     h.encryptionKeyIds.forEach(assertHolderId)
     return { ...h, encryptionKeyIds: [...h.encryptionKeyIds] }
   }
@@ -83,8 +84,9 @@ export function createShareService(options: {
       !Number.isFinite(Date.parse(d.expiresAt)) ||
       Date.parse(d.expiresAt) <= Date.now() ||
       Date.parse(d.expiresAt) < Date.parse(r.grant.expiresAt)
-    )
+    ) {
       throw new StorageError('FORBIDDEN')
+    }
   }
   function ownerStore(r: ShareReceipt) {
     return createVaultStorage({
@@ -118,8 +120,9 @@ export function createShareService(options: {
         d.itemId !== item.record.itemId ||
         d.itemVersion !== item.record.itemVersion ||
         d.consentRequestId !== consentRequestId
-      )
+      ) {
         throw new StorageError('FORBIDDEN')
+      }
       assertHolderId(d.recipientId)
       assertHolderId(d.recipientKeyId)
       const grant = parseContract('ShareGrant', {
@@ -143,8 +146,9 @@ export function createShareService(options: {
         recipientKeyId: d.recipientKeyId,
         ownerKeyIds: [...h.encryptionKeyIds],
       }
-      if (!(await options.backend.create(namespace, shareReference, bytes(r))))
-        throw new StorageError('FORBIDDEN') // replay denied, including after revoke
+      if (!(await options.backend.create(namespace, shareReference, bytes(r)))) {
+        throw new StorageError('FORBIDDEN')
+      } // replay denied, including after revoke
       return { shareReference, grant, recipientKeyId: d.recipientKeyId }
     },
     async publish(ref: string, input: unknown): Promise<void> {
@@ -154,11 +158,13 @@ export function createShareService(options: {
       await active(ref, r)
       const e = parseContract('KeyEnvelope', input)
       const item = await ownerStore(r).get(r.reference)
-      if (!item || item.record.keyId !== r.keyId || e.recipientKeyId !== r.recipientKeyId)
+      if (!item || item.record.keyId !== r.keyId || e.recipientKeyId !== r.recipientKeyId) {
         throw new StorageError('FORBIDDEN')
+      }
       assertShareBinding(item.record, e, r.grant)
-      if (!(await options.backend.create(namespace, derivedRef('envelope', ref), bytes(e))))
+      if (!(await options.backend.create(namespace, derivedRef('envelope', ref), bytes(e)))) {
         throw new StorageError('FORBIDDEN')
+      }
       await active(ref, r)
     },
     async receive(
@@ -166,14 +172,16 @@ export function createShareService(options: {
     ): Promise<{ record: EncryptedRecord; envelope: KeyEnvelope; grant: ShareGrant }> {
       const h = await auth()
       const r = await receipt(ref)
-      if (h.holderId !== r.grant.recipientId || !h.encryptionKeyIds.includes(r.recipientKeyId))
+      if (h.holderId !== r.grant.recipientId || !h.encryptionKeyIds.includes(r.recipientKeyId)) {
         throw new StorageError('FORBIDDEN')
+      }
       await active(ref, r)
       const raw = await load(derivedRef('envelope', ref))
       const e = parseContract('KeyEnvelope', raw)
       const item = await ownerStore(r).get(r.reference)
-      if (!item || item.record.keyId !== r.keyId || e.recipientKeyId !== r.recipientKeyId)
+      if (!item || item.record.keyId !== r.keyId || e.recipientKeyId !== r.recipientKeyId) {
         throw new StorageError('FORBIDDEN')
+      }
       assertShareBinding(item.record, e, r.grant)
       await active(ref, r)
       return { record: item.record, envelope: e, grant: r.grant }
