@@ -93,9 +93,9 @@ carries no `grantId`. Missing or non-`allow` decisions fail closed.
 
 **A: IdentityValidationReport** (#5). The result of checking a PAdES-signed PDF (France Identité
 proof). Indications and sub-indications are DSS's (`TOTAL_PASSED`, `TOTAL_FAILED`,
-`INDETERMINATE`; `HASH_FAILURE`, `SIG_CRYPTO_FAILURE`, `NO_CERTIFICATE_CHAIN_FOUND`,
-`OUT_OF_BOUNDS_NO_POE`, `NOT_YET_VALID`, `FORMAT_FAILURE`) so a DSS service (`validator: "dss"`)
-can produce it later. Five checks (`format`, `integrity`, `signature`, `chain`, `validity`);
+`INDETERMINATE`; `HASH_FAILURE`, `SIG_CRYPTO_FAILURE`, `NO_SIGNING_CERTIFICATE_FOUND`,
+`NO_CERTIFICATE_CHAIN_FOUND`, `OUT_OF_BOUNDS_NO_POE`, `NOT_YET_VALID`, `FORMAT_FAILURE`) so a
+DSS service (`validator: "dss"`) can produce it later. Five checks (`format`, `integrity`, `signature`, `chain`, `validity`);
 `TOTAL_PASSED` needs all five to pass, the `signer` certificate and the `trustAnchor` reached
 (SHA-256 of its DER). `documentDigest` is the SHA-256 of the PDF: private, never on chain. The
 report covers the signed document only, never that the person presenting it is its holder.

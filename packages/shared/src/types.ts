@@ -215,6 +215,7 @@ export interface IdentityValidationReport {
     | 'FORMAT_FAILURE'
     | 'HASH_FAILURE'
     | 'SIG_CRYPTO_FAILURE'
+    | 'NO_SIGNING_CERTIFICATE_FOUND'
     | 'NO_CERTIFICATE_CHAIN_FOUND'
     | 'OUT_OF_BOUNDS_NO_POE'
     | 'NOT_YET_VALID'
