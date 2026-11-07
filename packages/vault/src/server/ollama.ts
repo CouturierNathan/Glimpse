@@ -2,7 +2,9 @@ import { ExtractionError } from './extraction.ts'
 import type { ExtractionModel } from './extraction.ts'
 /** Loopback-only provider. No credentials, cloud URLs, redirects or document-selected endpoints. */
 export function createOllamaModel(model: string): ExtractionModel {
-  if (!/^[a-zA-Z0-9_.:/-]{1,80}$/.test(model)) throw new ExtractionError()
+  if (!/^[a-zA-Z0-9_.-]+:[a-zA-Z0-9_.-]+$/.test(model) || /cloud/i.test(model)) {
+    throw new ExtractionError()
+  }
   return {
     name: `ollama-local:${model}`,
     async complete(system, data) {
@@ -33,11 +35,15 @@ export function createOllamaModel(model: string): ExtractionModel {
             const { value, done } = await reader.read()
             if (done) break
             size += value.byteLength
-            if (size > 64 * 1024) throw new ExtractionError()
             chunks.push(value)
+            if (size > 64 * 1024) throw new ExtractionError()
           }
+        } catch {
+          chunks.forEach((chunk) => chunk.fill(0))
+          throw new ExtractionError()
         } finally {
           await reader.cancel()
+          if (size > 64 * 1024) chunks.forEach((chunk) => chunk.fill(0))
         }
         const bytes = new Uint8Array(size)
         let offset = 0
