@@ -104,3 +104,7 @@ real OCR, evidence hallucination/injection rejection, denied consent, secret/ide
 blocking, no unrelated prompt content, consent withdrawal and output/file purge.
 An actual downloaded Ollama model is not part of automated tests; a real local HTTP
 protocol server tests request/response bounds, redirects and errors deterministically.
+
+Final acceptance also includes a manually executed real local Ollama 0.40.15 +
+qwen2.5:0.5b run on the synthetic PDF, with cloud disabled. The complete B flow passed;
+no real personal document was used. Automated tests remain provider-independent.

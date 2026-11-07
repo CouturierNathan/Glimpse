@@ -152,3 +152,18 @@ concurrent puts, non-overwrite collisions, file permissions, traversal, symlinks
 hard links, private buffer copies and the browser/server export boundary.
 
 Run root `npm run lint && npm run format:check && npm test`.
+
+## Final review: exact bytes and client-side integrity
+
+Prefer packEncryptedItem -> putBytes -> getBytes -> verifyEncryptedItem for browser
+integration. The byte endpoints enforce the same holder/schema/size policy but persist
+exact upload bytes without JSON reserialization. The pack result's SHA-256 digest is
+kept independently by the client, separate from the randomly generated opaque locator.
+Changing even whitespace changes that pin. A compromised storage service cannot supply
+a new pin in the same response and have it treated as trusted. High-level decryption
+also requires the original recordDigest returned by client-side encryption.
+The legacy object put/get API remains useful server-side, but is not an origin-authentication
+mechanism. C's current registry anchors the signed attestation's salted commitment, NOT
+the random storage reference or a storage-byte digest; no live storage anchoring is claimed.
+FORBIDDEN is preserved when a previously registered encryption key is removed, instead
+of incorrectly reporting corruption. A should retain authorized historical key IDs.

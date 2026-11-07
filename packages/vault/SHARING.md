@@ -42,3 +42,10 @@ signature verification: C's verifier must still check its EIP-712 proof, commitm
 issuer, chain state and revocation. Tests independently recover C's fixture signer and
 recompute its commitment using C's helpers before holder/requester encrypted round trips.
 No test key is embedded by this package, and demo private encryption keys remain memory-only.
+
+Final integrity check: trustedOwnerExpectation and the requester's trusted expectation
+must include recordDigest from the holder's encryption-time state. Deliver it through
+an authenticated holder channel/signature or C's independently verified evidence; a pin
+read alongside a blob from an untrusted store does not prove its origin. The local demo
+retains the genuine pin in the client process. It does not invent a new shared signature
+protocol or claim that source-A declarations become issuer attestations.

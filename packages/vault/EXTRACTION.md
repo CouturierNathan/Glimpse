@@ -55,3 +55,14 @@ it is not an LLM and is never a silent fallback when Ollama fails. Synthetic tex
 text-layer PDF and scanned PDF fixtures contain no real personal data. Tests run
 real Poppler/Tesseract, adversarial output/injection cases, and a local HTTP protocol
 server for the Ollama adapter. They do not claim a downloaded Ollama model was run.
+
+## Manual real-model acceptance
+
+The final consolidated branch was also exercised against an actual local Ollama
+0.40.15 CPU runtime with qwen2.5:0.5b, cloud disabled, on the synthetic PDF. The entire
+`demo -- --ollama` flow passed. That live check exposed an unconstrained-output issue:
+the adapter now supplies a per-excerpt JSON Schema with grounded attribute/page/quote/
+period constants and a constrained value type, while independent deterministic
+validation still checks the proposed literal value and confidence. A successful real
+model run is separate evidence from the deterministic automated HTTP protocol tests.
+Model binaries/weights are not committed and must be installed by the demo operator.
