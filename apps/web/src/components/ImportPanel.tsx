@@ -7,7 +7,9 @@ import { type FormEvent, useState } from 'react'
 
 import { attributeName, documentKinds, importAttributes } from '@/lib/vault/attributes.ts'
 import { formatClaimValue } from '@/lib/format.ts'
+import { holderStatus } from '@/lib/status.ts'
 
+import { StatusBadge } from './StatusBadge.tsx'
 import { useVault, VaultError } from './VaultProvider.tsx'
 
 type Step =
@@ -69,8 +71,8 @@ export function ImportPanel() {
         <ul className="claims">
           {step.stored.map((claim) => (
             <li key={claim.claimId}>
-              <span className="mark" aria-hidden="true" />
               <span>{attributeName(claim.attribute)}</span>
+              <StatusBadge status={holderStatus(claim.document.provenance.class)} />
               <strong>{formatClaimValue(claim.value)}</strong>
             </li>
           ))}

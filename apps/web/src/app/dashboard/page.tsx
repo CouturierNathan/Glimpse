@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { StatusLegend } from '@/components/StatusBadge.tsx'
 import { VaultList } from '@/components/VaultList.tsx'
 
 export const metadata: Metadata = { title: 'Vault · Glimpse' }
@@ -15,7 +16,10 @@ export default function DashboardPage() {
 
       <VaultList />
 
-      <h2 className="section-title">How much each source proves</h2>
+      <h2 className="section-title">What each status means</h2>
+      <StatusLegend />
+
+      <h2 className="section-title">Where your attributes come from</h2>
       <ul className="sources">
         <li>
           <span className="mark" aria-hidden="true" />

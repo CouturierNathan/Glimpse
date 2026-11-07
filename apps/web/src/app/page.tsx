@@ -1,5 +1,7 @@
 import Link from 'next/link'
 
+import { StatusBadge } from '@/components/StatusBadge.tsx'
+
 /** Every line of the attestation stays masked except the one the requester asked for. */
 const hiddenRows = [
   { label: 'Full name', width: '72%' },
@@ -43,20 +45,7 @@ export default function HomePage() {
             </div>
           </dl>
           <figcaption className="doc-foot">
-            <svg viewBox="0 0 20 20" aria-hidden="true">
-              <path
-                d="M10 1.5 12.2 4l3.3-.3.3 3.3L18.5 10 16 12.2l-.3 3.3-3.3.3L10 18.5 7.8 16l-3.3-.3-.3-3.3L1.5 10 4 7.8l.3-3.3 3.3.3Z"
-                fill="currentColor"
-              />
-              <path
-                d="m6.5 10 2.4 2.4 4.6-4.8"
-                fill="none"
-                stroke="var(--card)"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <StatusBadge status="authentic" />
             Signed by the issuer, checked on chain by the requester.
           </figcaption>
         </figure>
