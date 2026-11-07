@@ -27,7 +27,7 @@ export function AccountButton() {
       </span>
       <button
         type="button"
-        className="button secondary"
+        className="button quiet"
         onClick={async () => {
           await signOut()
           router.push('/')
