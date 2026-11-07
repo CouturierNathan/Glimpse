@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimpse.example/schemas/v1/IdentityValidationReport.schema.json",
+  "title": "IdentityValidationReport",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "reportId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "validator": {
+      "enum": ["glimpse-pades", "dss"]
+    },
+    "documentDigest": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "indication": {
+      "enum": ["TOTAL_PASSED", "TOTAL_FAILED", "INDETERMINATE"]
+    },
+    "subIndication": {
+      "enum": [
+        "FORMAT_FAILURE",
+        "HASH_FAILURE",
+        "SIG_CRYPTO_FAILURE",
+        "NO_CERTIFICATE_CHAIN_FOUND",
+        "OUT_OF_BOUNDS_NO_POE",
+        "NOT_YET_VALID"
+      ]
+    },
+    "checks": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "enum": ["pass", "fail", "unknown"]
+        },
+        "integrity": {
+          "enum": ["pass", "fail", "unknown"]
+        },
+        "signature": {
+          "enum": ["pass", "fail", "unknown"]
+        },
+        "chain": {
+          "enum": ["pass", "fail", "unknown"]
+        },
+        "validity": {
+          "enum": ["pass", "fail", "unknown"]
+        }
+      },
+      "required": ["format", "integrity", "signature", "chain", "validity"],
+      "additionalProperties": false
+    },
+    "signer": {
+      "type": "object",
+      "properties": {
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "issuer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "serialNumber": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{1,64}$"
+        },
+        "notBefore": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+        },
+        "notAfter": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+        }
+      },
+      "required": ["subject", "issuer", "serialNumber", "notBefore", "notAfter"],
+      "additionalProperties": false
+    },
+    "signingTime": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "trustAnchor": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    },
+    "validatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "reportId",
+    "validator",
+    "documentDigest",
+    "indication",
+    "checks",
+    "validatedAt"
+  ],
+  "additionalProperties": false
+}

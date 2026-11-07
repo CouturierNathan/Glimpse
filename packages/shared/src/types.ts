@@ -156,6 +156,89 @@ export interface VerificationResult {
   issuerTrusted: boolean
   checkedAt: string
 }
+/** Pole A. The SIWE-authenticated wallet behind a session cookie; the app chain is fixed. */
+export interface AuthSession {
+  schemaVersion: '1.0.0'
+  address: Address
+  chainId: number
+  issuedAt: string
+  expiresAt: string
+}
+/**
+ * Pole A. What the holder asks to extract from one uploaded document; the file travels beside it.
+ * Identity proofs are not uploads: they go through the identity check, never the extractor.
+ */
+export interface DocumentUploadRequest {
+  schemaVersion: '1.0.0'
+  documentId: OpaqueId
+  documentVersion: number
+  kind: 'synthetic' | 'education' | 'employment'
+  mediaType: 'application/pdf' | 'text/plain'
+  /** The attributes the holder consents to extract, nothing else is read. */
+  attributes: string[]
+}
+/**
+ * Pole A. The holder's answer to one VerificationRequest (consentRequestId is its requestId).
+ * Allow names exactly one item version and needs decidedAt < expiresAt; deny carries a reason.
+ * B maps an allow to its ConsentDecision and creates the grant from it, so no grantId here.
+ */
+export interface AccessDecision {
+  schemaVersion: '1.0.0'
+  outcome: 'allow' | 'deny'
+  holderId: OpaqueId
+  consentRequestId: OpaqueId
+  recipientId: OpaqueId
+  recipientKeyId: OpaqueId
+  /** Allow only. */
+  itemId?: OpaqueId
+  itemVersion?: number
+  /** Deny only. */
+  reason?: 'holder-refused' | 'consent-withdrawn' | 'request-expired'
+  decidedAt: string
+  /** End of the consent: the request's own expiry. */
+  expiresAt: string
+}
+/**
+ * Pole A. Result of checking a PAdES-signed PDF (a France Identité proof), with DSS's indications
+ * so a DSS service can produce it instead. It covers the signed document only: it never proves
+ * that whoever presents it is the person it names. TOTAL_PASSED needs every check to pass, a
+ * signer and the trust anchor reached; any other indication needs a subIndication.
+ */
+export interface IdentityValidationReport {
+  schemaVersion: '1.0.0'
+  reportId: OpaqueId
+  validator: 'glimpse-pades' | 'dss'
+  /** SHA-256 of the whole PDF. Private: never on chain. */
+  documentDigest: Hex
+  indication: 'TOTAL_PASSED' | 'TOTAL_FAILED' | 'INDETERMINATE'
+  subIndication?:
+    | 'FORMAT_FAILURE'
+    | 'HASH_FAILURE'
+    | 'SIG_CRYPTO_FAILURE'
+    | 'NO_CERTIFICATE_CHAIN_FOUND'
+    | 'OUT_OF_BOUNDS_NO_POE'
+    | 'NOT_YET_VALID'
+  checks: {
+    format: CheckOutcome
+    integrity: CheckOutcome
+    signature: CheckOutcome
+    chain: CheckOutcome
+    validity: CheckOutcome
+  }
+  signer?: {
+    subject: string
+    issuer: string
+    /** Lowercase hex. */
+    serialNumber: string
+    notBefore: string
+    notAfter: string
+  }
+  /** The signing time the signer claims; not a proof of existence without a timestamp. */
+  signingTime?: string
+  /** SHA-256 of the DER trust anchor certificate the chain ends at. */
+  trustAnchor?: Hex
+  validatedAt: string
+}
 export interface DataContracts {
   ExtractedClaim: ExtractedClaim
   EncryptedRecord: EncryptedRecord
@@ -165,4 +248,8 @@ export interface DataContracts {
   IssuerRegistryEntry: IssuerRegistryEntry
   VerificationRequest: VerificationRequest
   VerificationResult: VerificationResult
+  AuthSession: AuthSession
+  DocumentUploadRequest: DocumentUploadRequest
+  AccessDecision: AccessDecision
+  IdentityValidationReport: IdentityValidationReport
 }
