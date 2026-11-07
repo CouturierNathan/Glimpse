@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glimpse.example/schemas/v1/EncryptedRecord.schema.json",
+  "title": "EncryptedRecord",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "itemId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "itemVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "keyId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$"
+    },
+    "sourceClass": {
+      "type": "string",
+      "enum": ["A", "B", "C"]
+    },
+    "algorithm": {
+      "const": "A256GCM"
+    },
+    "ciphertext": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?$",
+      "minLength": 22
+    },
+    "iv": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?$",
+      "minLength": 16,
+      "maxLength": 16
+    },
+    "aadVersion": {
+      "const": "1"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "itemId",
+    "itemVersion",
+    "keyId",
+    "sourceClass",
+    "algorithm",
+    "ciphertext",
+    "iv",
+    "aadVersion"
+  ],
+  "additionalProperties": false
+}
