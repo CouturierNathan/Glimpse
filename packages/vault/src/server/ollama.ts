@@ -1,7 +1,10 @@
 import { ExtractionError } from './extraction.ts'
 import type { ExtractionModel } from './extraction.ts'
 /** Loopback-only provider. No credentials, cloud URLs, redirects or document-selected endpoints. */
-export function createOllamaModel(model: string): ExtractionModel {
+export function createOllamaModel(
+  model: string,
+  transport: typeof fetch = globalThis.fetch,
+): ExtractionModel {
   if (!/^[a-zA-Z0-9_.-]+:[a-zA-Z0-9_.-]+$/.test(model) || /cloud/i.test(model)) {
     throw new ExtractionError()
   }
@@ -9,7 +12,7 @@ export function createOllamaModel(model: string): ExtractionModel {
     name: `ollama-local:${model}`,
     async complete(system, data) {
       try {
-        const response = await fetch('http://127.0.0.1:11434/api/chat', {
+        const response = await transport('http://127.0.0.1:11434/api/chat', {
           method: 'POST',
           redirect: 'error',
           signal: AbortSignal.timeout(30_000),

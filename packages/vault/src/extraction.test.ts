@@ -142,10 +142,15 @@ test('Ollama adapter speaks the real HTTP protocol with bounded JSON and no redi
   })
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
-    server.listen(11434, '127.0.0.1', resolve)
+    server.listen(0, '127.0.0.1', resolve)
   })
   t.after(() => new Promise<void>((resolve) => server.close(() => resolve())))
-  const model = createOllamaModel('qwen2.5:0.5b')
+  const address = server.address()
+  assert.ok(address && typeof address !== 'string')
+  const model = createOllamaModel('qwen2.5:0.5b', (_url, init) => {
+    assert.equal(_url, 'http://127.0.0.1:11434/api/chat')
+    return fetch(`http://127.0.0.1:${address.port}`, init)
+  })
   assert.deepEqual(await model.complete('fixed policy', 'selected synthetic excerpt'), [])
   const request = JSON.parse(body) as {
     stream: boolean
