@@ -13,6 +13,7 @@ import {
   uploadMediaType,
 } from '@/lib/vault/attributes.ts'
 import { formatClaimValue } from '@/lib/format.ts'
+import { rawClaimValue, reviewClaim } from '@/lib/vault/review.ts'
 import { holderStatus } from '@/lib/status.ts'
 
 import { StatusBadge } from './StatusBadge.tsx'
@@ -21,6 +22,13 @@ import { useVault, VaultError } from './VaultProvider.tsx'
 type Step =
   | { name: 'idle' }
   | { name: 'reading' }
+  | {
+      name: 'review'
+      claims: ExtractedClaim[]
+      source: DocumentReference
+      missing: string[]
+      error?: string
+    }
   | { name: 'encrypting' }
   | { name: 'done'; stored: ExtractedClaim[]; missing: string[]; signed: boolean }
   | { name: 'error'; message: string; signedOut: boolean }
@@ -72,22 +80,122 @@ export function ImportPanel() {
         source = verified.source
       }
 
-      setStep({ name: 'encrypting' })
-      for (const claim of claims) await store(claim, source)
       const found = new Set(claims.map((c) => c.attribute))
       setStep({
-        name: 'done',
-        stored: claims,
+        name: 'review',
+        claims,
+        source,
         missing: attributes.filter((a) => !found.has(a)),
-        signed: source.provenance.class === 'B',
       })
     } catch (error) {
-      setStep({
-        name: 'error',
-        message: error instanceof Error ? error.message : 'Import failed, try again.',
-        signedOut: error instanceof VaultError && error.code === 'SIGNED_OUT',
-      })
+      fail(error)
     }
+  }
+
+  function fail(error: unknown) {
+    setStep({
+      name: 'error',
+      message: error instanceof Error ? error.message : 'Import failed, try again.',
+      signedOut: error instanceof VaultError && error.code === 'SIGNED_OUT',
+    })
+  }
+
+  /** Nothing is encrypted before the holder has seen, corrected or dropped each value. */
+  async function onConfirm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (step.name !== 'review') return
+    const fields = new FormData(event.currentTarget)
+    let reviewed: ExtractedClaim[]
+    try {
+      reviewed = step.claims
+        .filter((c) => fields.get(`keep-${c.claimId}`) === 'on')
+        .map((c) => reviewClaim(c, String(fields.get(`value-${c.claimId}`))))
+    } catch (error) {
+      setStep({ ...step, error: error instanceof Error ? error.message : 'Check the values.' })
+      return
+    }
+    const { source, missing } = step
+    try {
+      setStep({ name: 'encrypting' })
+      for (const claim of reviewed) {
+        // A corrected value is the holder's declaration: stored as class A, never as signed.
+        const declared = claim.document.provenance.class === 'A'
+        await store(claim, declared ? { ...source, provenance: { class: 'A' } } : source)
+      }
+      setStep({
+        name: 'done',
+        stored: reviewed,
+        missing,
+        signed: reviewed.some((c) => c.document.provenance.class === 'B'),
+      })
+    } catch (error) {
+      fail(error)
+    }
+  }
+
+  if (step.name === 'review') {
+    return (
+      <form className="panel form" onSubmit={onConfirm}>
+        <h2>Check what was read</h2>
+        <p className="hint">
+          Correct a value or untick it before anything is encrypted. A value you change is stored as
+          your own declaration, not as read from a signed document.
+        </p>
+        {step.claims.length === 0 && <p>No requested attribute was found in this document.</p>}
+        {step.claims.map((claim) => (
+          <fieldset key={claim.claimId} className="field">
+            <legend>{attributeName(claim.attribute)}</legend>
+            <label className="check">
+              <input type="checkbox" name={`keep-${claim.claimId}`} defaultChecked />
+              Keep this value
+            </label>
+            {claim.value.type === 'boolean' ? (
+              <select
+                name={`value-${claim.claimId}`}
+                defaultValue={rawClaimValue(claim.value)}
+                aria-label={`${attributeName(claim.attribute)} value`}
+              >
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            ) : (
+              <input
+                name={`value-${claim.claimId}`}
+                type={
+                  claim.value.type === 'number'
+                    ? 'number'
+                    : claim.value.type === 'date'
+                      ? 'date'
+                      : 'text'
+                }
+                step={claim.value.type === 'number' ? 'any' : undefined}
+                defaultValue={rawClaimValue(claim.value)}
+                aria-label={`${attributeName(claim.attribute)} value`}
+                required
+              />
+            )}
+          </fieldset>
+        ))}
+        {step.missing.length > 0 && (
+          <p className="hint">
+            Not found in this document: {step.missing.map(attributeName).join(', ')}.
+          </p>
+        )}
+        <div className="actions">
+          <button type="submit" className="button">
+            Encrypt and add to my vault
+          </button>
+          <button type="button" className="button quiet" onClick={() => setStep({ name: 'idle' })}>
+            Cancel
+          </button>
+        </div>
+        {step.error && (
+          <p role="alert" className="error">
+            {step.error}
+          </p>
+        )}
+      </form>
+    )
   }
 
   if (step.name === 'done') {
@@ -109,8 +217,8 @@ export function ImportPanel() {
         </ul>
         {step.signed && (
           <p className="hint">
-            The document&apos;s signature was verified against a trusted authority: these attributes
-            are marked as coming from a signed document.
+            The document&apos;s signature was verified against a trusted authority: the values you
+            kept unchanged are marked as coming from a signed document.
           </p>
         )}
         {step.missing.length > 0 && (
@@ -180,7 +288,7 @@ export function ImportPanel() {
           ? 'Reading the document…'
           : step.name === 'encrypting'
             ? 'Encrypting in your browser…'
-            : 'Extract and encrypt'}
+            : 'Extract'}
       </button>
       {step.name === 'error' && (
         <p role="alert" className="error">
