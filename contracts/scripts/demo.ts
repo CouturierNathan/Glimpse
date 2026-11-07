@@ -128,6 +128,7 @@ const opened = await decryptItem(vault.record, vault.envelope, holderKeys, {
   ...item,
   keyId: vault.record.keyId,
   sourceClass: 'C',
+  recordDigest: vault.recordDigest,
 })
 console.log(`Decrypted from the vault: ${opened.attribute} = ${JSON.stringify(opened.value.value)}`)
 const shared = { ...record, attribute: opened.attribute, value: opened.value }
