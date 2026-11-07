@@ -4,3 +4,4 @@ contracts/cache/
 contracts/types/
 .next/
 next-env.d.ts
+contracts/ignition/deployments/
