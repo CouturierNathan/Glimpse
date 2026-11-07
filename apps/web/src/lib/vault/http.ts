@@ -56,6 +56,10 @@ export function vaultErrorResponse(error: unknown): Response {
     return errorResponse(422, 'No requested attribute could be read from this document.')
   }
   if (error instanceof BodyTooLargeError) return errorResponse(413, messageByCode.TOO_LARGE)
+  // Our own request-flow errors carry a status and a message written for the user.
+  if (error instanceof Error && error.name === 'RequestError' && 'status' in error) {
+    return errorResponse(Number(error.status), error.message)
+  }
   return errorResponse(500, 'Something went wrong on the server.')
 }
 
