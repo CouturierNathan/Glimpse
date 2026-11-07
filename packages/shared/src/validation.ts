@@ -169,5 +169,33 @@ export function parseContract<K extends ContractName>(name: K, value: unknown): 
       throw new TypeError('Incoherent verification result')
     }
   }
+  if (name === 'AuthSession') {
+    const a = value as DataContracts['AuthSession']
+    if (a.expiresAt <= a.issuedAt) throw new TypeError('Invalid session chronology')
+  }
+  if (name === 'AccessDecision') {
+    const d = value as DataContracts['AccessDecision']
+    const item = d.itemId !== undefined
+    if (
+      item !== (d.itemVersion !== undefined) ||
+      item !== (d.outcome === 'allow') ||
+      (d.reason !== undefined) !== (d.outcome === 'deny') ||
+      (d.outcome === 'allow' && d.expiresAt <= d.decidedAt)
+    ) {
+      throw new TypeError('Incoherent access decision')
+    }
+  }
+  if (name === 'IdentityValidationReport') {
+    const r = value as DataContracts['IdentityValidationReport']
+    const passed = r.indication === 'TOTAL_PASSED'
+    if (
+      passed === (r.subIndication !== undefined) ||
+      passed !== Object.values(r.checks).every((c) => c === 'pass') ||
+      (passed && (r.signer === undefined || r.trustAnchor === undefined)) ||
+      (r.signer !== undefined && r.signer.notAfter <= r.signer.notBefore)
+    ) {
+      throw new TypeError('Incoherent identity validation report')
+    }
+  }
   return structuredClone(value) as DataContracts[K]
 }

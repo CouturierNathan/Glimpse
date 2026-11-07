@@ -212,3 +212,53 @@ test('RSA-OAEP label binds key envelope to recipient and immutable tuple', async
     )
   }
 })
+test('pole A contracts: session chronology, coherent decisions and reports', () => {
+  const session = parseContract('AuthSession', fixtures.valid.AuthSession)
+  assert.throws(() => parseContract('AuthSession', { ...session, expiresAt: session.issuedAt }))
+  assert.throws(() => parseContract('AuthSession', { ...session, address: '0x1234' }))
+
+  const upload = parseContract('DocumentUploadRequest', fixtures.valid.DocumentUploadRequest)
+  for (const patch of [
+    { attributes: [] },
+    { attributes: ['exam_score', 'exam_score'] },
+    { kind: 'identity' },
+    { mediaType: 'image/png' },
+  ]) {
+    assert.throws(() => parseContract('DocumentUploadRequest', { ...upload, ...patch }))
+  }
+
+  const allow = parseContract('AccessDecision', fixtures.valid.AccessDecision)
+  const { itemId: _, itemVersion: __, ...noItem } = allow
+  const deny = { ...noItem, outcome: 'deny', reason: 'holder-refused' }
+  assert.deepEqual(parseContract('AccessDecision', deny), deny)
+  for (const decision of [
+    noItem,
+    { ...allow, reason: 'holder-refused' },
+    { ...deny, itemId: id, itemVersion: 1 },
+    { ...noItem, outcome: 'deny' },
+    { ...allow, itemVersion: undefined },
+    { ...allow, decidedAt: allow.expiresAt },
+  ]) {
+    assert.throws(() => parseContract('AccessDecision', JSON.parse(JSON.stringify(decision))))
+  }
+
+  const report = parseContract('IdentityValidationReport', fixtures.valid.IdentityValidationReport)
+  const failed = {
+    ...report,
+    indication: 'TOTAL_FAILED',
+    subIndication: 'HASH_FAILURE',
+    checks: { ...report.checks, integrity: 'fail' },
+  }
+  assert.deepEqual(parseContract('IdentityValidationReport', failed), failed)
+  const { trustAnchor: ___, ...noAnchor } = report
+  for (const r of [
+    { ...report, subIndication: 'HASH_FAILURE' },
+    { ...report, checks: { ...report.checks, chain: 'unknown' } },
+    { ...failed, subIndication: undefined },
+    { ...failed, checks: report.checks },
+    noAnchor,
+    { ...report, signer: { ...report.signer, notAfter: report.signer?.notBefore } },
+  ]) {
+    assert.throws(() => parseContract('IdentityValidationReport', JSON.parse(JSON.stringify(r))))
+  }
+})

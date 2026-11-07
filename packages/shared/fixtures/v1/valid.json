@@ -121,5 +121,56 @@
     },
     "issuerTrusted": true,
     "checkedAt": "2026-11-06T10:05:00.000Z"
+  },
+  "AuthSession": {
+    "schemaVersion": "1.0.0",
+    "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+    "chainId": 84532,
+    "issuedAt": "2026-11-07T09:00:00.000Z",
+    "expiresAt": "2026-11-07T17:00:00.000Z"
+  },
+  "DocumentUploadRequest": {
+    "schemaVersion": "1.0.0",
+    "documentId": "0000000000000000000000000000000b",
+    "documentVersion": 1,
+    "kind": "education",
+    "mediaType": "application/pdf",
+    "attributes": ["student_status", "exam_score"]
+  },
+  "AccessDecision": {
+    "schemaVersion": "1.0.0",
+    "outcome": "allow",
+    "holderId": "00000000000000000000000000000009",
+    "consentRequestId": "0000000000000000000000000000000a",
+    "recipientId": "00000000000000000000000000000006",
+    "recipientKeyId": "00000000000000000000000000000007",
+    "itemId": "00000000000000000000000000000003",
+    "itemVersion": 1,
+    "decidedAt": "2026-11-05T12:00:00.000Z",
+    "expiresAt": "2026-11-05T12:15:00.000Z"
+  },
+  "IdentityValidationReport": {
+    "schemaVersion": "1.0.0",
+    "reportId": "0000000000000000000000000000000c",
+    "validator": "glimpse-pades",
+    "documentDigest": "0x1111111111111111111111111111111111111111111111111111111111111111",
+    "indication": "TOTAL_PASSED",
+    "checks": {
+      "format": "pass",
+      "integrity": "pass",
+      "signature": "pass",
+      "chain": "pass",
+      "validity": "pass"
+    },
+    "signer": {
+      "subject": "CN=FAKE Glimpse Test Signer, O=FAKE Glimpse Test, C=FR",
+      "issuer": "CN=FAKE Glimpse Test CA, O=FAKE Glimpse Test, C=FR",
+      "serialNumber": "02",
+      "notBefore": "2026-01-01T00:00:00.000Z",
+      "notAfter": "2036-01-01T00:00:00.000Z"
+    },
+    "signingTime": "2026-11-07T08:55:00.000Z",
+    "trustAnchor": "0x2222222222222222222222222222222222222222222222222222222222222222",
+    "validatedAt": "2026-11-07T09:00:00.000Z"
   }
 }
