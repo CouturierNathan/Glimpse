@@ -8,6 +8,10 @@
     "deploy:base-sepolia": "hardhat ignition deploy ignition/modules/Glimpse.ts --network baseSepolia",
     "demo": "hardhat run scripts/demo.ts"
   },
+  "dependencies": {
+    "@glimpse/shared": "0.1.0",
+    "@glimpse/vault": "0.1.0"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^3.1.9",
     "@nomicfoundation/hardhat-toolbox-viem": "^5.0.7",
