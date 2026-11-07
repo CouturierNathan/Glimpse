@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "@glimpse/shared": "0.1.0",
-    "@glimpse/vault": "0.1.0"
+    "@glimpse/vault": "0.1.0",
+    "@glimpse/verifier": "0.1.0"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ignition": "^3.1.9",

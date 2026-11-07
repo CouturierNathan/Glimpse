@@ -21,11 +21,7 @@ import {
 } from '@glimpse/vault/server'
 import type { AuthenticatedHolder, ConsentDecision } from '@glimpse/vault/server'
 import { createMemoryStorageBackendForTests } from '@glimpse/vault/server/testing'
-import {
-  attestationCommitment,
-  attestationTypes,
-  attestationDomain,
-} from '../../../contracts/attestation.ts'
+import { attestationCommitment, attestationTypes, attestationDomain } from '@glimpse/verifier'
 import { recoverTypedDataAddress } from 'viem'
 let owner: EncryptionIdentity
 let requester: EncryptionIdentity
