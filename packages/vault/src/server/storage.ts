@@ -33,6 +33,8 @@ export interface StorageBackend {
 }
 export interface VaultStorage {
   put(input: unknown): Promise<StorageReference>
+  putBytes(input: Uint8Array): Promise<StorageReference>
+  getBytes(ref: StorageReference): Promise<Uint8Array | null>
   get(ref: StorageReference): Promise<StoredItem | null>
   delete(ref: StorageReference): Promise<boolean>
 }
@@ -142,10 +144,30 @@ export function createVaultStorage(options: {
       throw new StorageError('UNAVAILABLE')
     }
   }
+  function decode(bytes: Uint8Array, holder: AuthenticatedHolder): StoredItem {
+    if (bytes.byteLength > max) throw new StorageError('CORRUPT')
+    try {
+      const stored = object(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)))
+      if (stored.storageVersion !== 1 || Object.keys(stored).length !== 3) {
+        throw new StorageError('CORRUPT')
+      }
+      return validate({ record: stored.record, envelopes: stored.envelopes }, holder)
+    } catch (error) {
+      if (error instanceof StorageError && error.code === 'FORBIDDEN') throw error
+      throw new StorageError('CORRUPT')
+    }
+  }
+  async function create(holder: AuthenticatedHolder, bytes: Uint8Array): Promise<StorageReference> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const ref = randomBytes(32).toString('hex')
+      if (await io(() => options.backend.create(holder.holderId, ref, bytes))) return ref
+    }
+    throw new StorageError('UNAVAILABLE')
+  }
   return {
     async put(input) {
       const holder = await authenticate()
-      serialize(input, max) // Bound untrusted JSON before the shared schema evaluator.
+      serialize(input, max)
       let item: StoredItem
       try {
         item = validate(input, holder)
@@ -153,28 +175,29 @@ export function createVaultStorage(options: {
         if (error instanceof StorageError) throw error
         throw new StorageError('INVALID_INPUT')
       }
-      const bytes = serialize({ storageVersion: 1, ...item }, max)
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const ref = randomBytes(32).toString('hex')
-        if (await io(() => options.backend.create(holder.holderId, ref, bytes))) return ref
-      }
-      throw new StorageError('UNAVAILABLE')
+      return create(holder, serialize({ storageVersion: 1, ...item }, max))
+    },
+    async putBytes(input) {
+      const holder = await authenticate()
+      if (!(input instanceof Uint8Array)) throw new StorageError('INVALID_INPUT')
+      if (input.byteLength > max) throw new StorageError('TOO_LARGE')
+      const bytes = Uint8Array.from(input)
+      decode(bytes, holder)
+      return create(holder, bytes) // Preserve the exact bytes pinned by the client, including whitespace.
+    },
+    async getBytes(ref) {
+      const holder = await authenticate()
+      assertReference(ref)
+      const bytes = await io(() => options.backend.read(holder.holderId, ref, max))
+      if (bytes === null) return null
+      decode(bytes, holder)
+      return bytes.slice()
     },
     async get(ref) {
       const holder = await authenticate()
       assertReference(ref)
       const bytes = await io(() => options.backend.read(holder.holderId, ref, max))
-      if (bytes === null) return null
-      if (bytes.byteLength > max) throw new StorageError('CORRUPT')
-      try {
-        const stored = object(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)))
-        if (stored.storageVersion !== 1 || Object.keys(stored).length !== 3) {
-          throw new StorageError('CORRUPT')
-        }
-        return validate({ record: stored.record, envelopes: stored.envelopes }, holder)
-      } catch {
-        throw new StorageError('CORRUPT')
-      }
+      return bytes === null ? null : decode(bytes, holder)
     },
     async delete(ref) {
       const holder = await authenticate()

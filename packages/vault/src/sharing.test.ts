@@ -43,7 +43,8 @@ const session = (p: EncryptionIdentity): AuthenticatedHolder => ({
 const expect = (
   r: { itemId: string; itemVersion: number; keyId: string; sourceClass: 'A' | 'B' | 'C' },
   grantId: string,
-) => ({ ...r, grantId })
+  recordDigest: string,
+) => ({ ...r, grantId, recordDigest })
 async function setup(backend = createMemoryStorageBackendForTests()) {
   const claim = parseContract('ExtractedClaim', fixtures.valid.ExtractedClaim)
   const item = await encryptItem(claim, claim.document, owner, {
@@ -97,7 +98,7 @@ test('recipient receives exactly one granted attribute and no holder key', async
     f.item.record,
     f.item.envelope,
     owner,
-    expect(f.item.record, f.item.envelope.grantId),
+    expect(f.item.record, f.item.envelope.grantId, f.item.recordDigest),
     ticket.grant,
     requester,
   )
@@ -110,7 +111,7 @@ test('recipient receives exactly one granted attribute and no holder key', async
       received.record,
       received.envelope,
       requester,
-      expect(received.record, received.grant.grantId),
+      expect(received.record, received.grant.grantId, f.item.recordDigest),
     ),
     f.claim,
   )
@@ -121,7 +122,7 @@ test('recipient receives exactly one granted attribute and no holder key', async
       f.item.record,
       f.item.envelope,
       requester,
-      expect(f.item.record, f.item.envelope.grantId),
+      expect(f.item.record, f.item.envelope.grantId, f.item.recordDigest),
     ),
   )
   const other = await encryptItem(f.claim, f.claim.document, owner, {
@@ -130,7 +131,12 @@ test('recipient receives exactly one granted attribute and no holder key', async
     grantId: generateOpaqueId(),
   })
   await assert.rejects(
-    decryptItem(other.record, e, requester, expect(other.record, ticket.grant.grantId)),
+    decryptItem(
+      other.record,
+      e,
+      requester,
+      expect(other.record, ticket.grant.grantId, other.recordDigest),
+    ),
   )
   f.actor(stranger)
   await assert.rejects(service.receive(ticket.shareReference))
@@ -159,7 +165,7 @@ test('replay, revoked consent and wrong recipient keys fail closed', async () =>
     f.item.record,
     f.item.envelope,
     owner,
-    expect(f.item.record, f.item.envelope.grantId),
+    expect(f.item.record, f.item.envelope.grantId, f.item.recordDigest),
     ticket.grant,
     requester,
   )
@@ -185,7 +191,7 @@ test('expiry is checked during envelope creation and every delivery', async () =
       f.item.record,
       f.item.envelope,
       owner,
-      expect(f.item.record, f.item.envelope.grantId),
+      expect(f.item.record, f.item.envelope.grantId, f.item.recordDigest),
       expired,
       requester,
     ),
@@ -194,7 +200,7 @@ test('expiry is checked during envelope creation and every delivery', async () =
     f.item.record,
     f.item.envelope,
     owner,
-    expect(f.item.record, f.item.envelope.grantId),
+    expect(f.item.record, f.item.envelope.grantId, f.item.recordDigest),
     ticket.grant,
     requester,
   )
@@ -213,7 +219,7 @@ test('file-persisted revocation survives a new service/adapter and cannot be rep
     f.item.record,
     f.item.envelope,
     owner,
-    expect(f.item.record, f.item.envelope.grantId),
+    expect(f.item.record, f.item.envelope.grantId, f.item.recordDigest),
     ticket.grant,
     requester,
   )
@@ -265,7 +271,7 @@ test('C signed fixture commitment/signature survives holder encryption and reque
       item.record,
       item.envelope,
       owner,
-      expect(item.record, item.envelope.grantId),
+      expect(item.record, item.envelope.grantId, item.recordDigest),
     ),
     a,
   )
@@ -285,15 +291,25 @@ test('C signed fixture commitment/signature survives holder encryption and reque
     item.record,
     item.envelope,
     owner,
-    expect(item.record, item.envelope.grantId),
+    expect(item.record, item.envelope.grantId, item.recordDigest),
     grant,
     requester,
   )
   assert.deepEqual(
-    await decryptAttestation(item.record, e, requester, expect(item.record, grant.grantId)),
+    await decryptAttestation(
+      item.record,
+      e,
+      requester,
+      expect(item.record, grant.grantId, item.recordDigest),
+    ),
     a,
   )
   await assert.rejects(
-    decryptAttestation(item.record, e, stranger, expect(item.record, grant.grantId)),
+    decryptAttestation(
+      item.record,
+      e,
+      stranger,
+      expect(item.record, grant.grantId, item.recordDigest),
+    ),
   )
 })
