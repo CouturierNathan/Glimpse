@@ -7,6 +7,7 @@ import { WagmiProvider } from 'wagmi'
 import { wagmiConfig } from '@/lib/wagmi.ts'
 
 import { SessionProvider } from './SessionProvider.tsx'
+import { VaultProvider } from './VaultProvider.tsx'
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
@@ -14,7 +15,9 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          <VaultProvider>{children}</VaultProvider>
+        </SessionProvider>
       </QueryClientProvider>
     </WagmiProvider>
   )
