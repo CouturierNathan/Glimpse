@@ -628,3 +628,176 @@ a {
     border-color: var(--ink);
   }
 }
+
+/* ---------- Import form ---------- */
+
+.form {
+  display: grid;
+  gap: 1.5rem;
+  max-width: 36rem;
+  margin-top: 2.5rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.field > label,
+.field legend {
+  padding: 0;
+  font-weight: 700;
+}
+
+.field legend {
+  margin-bottom: 0.4rem;
+}
+
+.hint {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+}
+
+.form select,
+.form input[type='file'] {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.6rem;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.form input[type='file']::file-selector-button {
+  margin-right: 0.75rem;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.4rem;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  min-height: 2.75rem;
+  padding: 0.55rem 0;
+  cursor: pointer;
+}
+
+.check input {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0.2rem 0 0;
+  accent-color: var(--tint);
+}
+
+.consent {
+  padding: 1rem;
+  border-radius: 0.6rem;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.import-result {
+  max-width: 36rem;
+  margin-top: 2.5rem;
+}
+
+.import-result h2 {
+  font-size: 1.35rem;
+}
+
+.claims {
+  margin: 1.25rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.claims li {
+  display: grid;
+  grid-template-columns: 1.1rem 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.claims .mark,
+.item .mark {
+  margin-top: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+/* ---------- Vault items ---------- */
+
+.vault {
+  max-width: 44rem;
+  margin-top: 2rem;
+}
+
+.items {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 1.1rem minmax(0, 1fr) minmax(5rem, 8rem) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.item-name {
+  display: grid;
+}
+
+.item-name span {
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  letter-spacing: 0.01em;
+}
+
+.item-value {
+  font-weight: 700;
+}
+
+.item-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.item-error {
+  grid-column: 2 / -1;
+  margin: 0;
+}
+
+@media (max-width: 36rem) {
+  .item {
+    grid-template-columns: 1.1rem minmax(0, 1fr) auto;
+  }
+
+  .item-actions {
+    grid-column: 2 / -1;
+  }
+}

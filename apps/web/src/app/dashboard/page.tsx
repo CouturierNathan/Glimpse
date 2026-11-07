@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
+import { VaultList } from '@/components/VaultList.tsx'
 
 export const metadata: Metadata = { title: 'Vault · Glimpse' }
 
@@ -9,17 +9,11 @@ export default function DashboardPage() {
       <header className="page-head">
         <h1>Vault</h1>
         <p className="lede">
-          Your attributes, grouped by where they come from. Only you can open them.
+          Your attributes, each marked with where it comes from. Only you can open them.
         </p>
       </header>
 
-      <div className="empty">
-        <h2>Your vault is empty</h2>
-        <p>Import a France Identité proof or a document to add your first attributes.</p>
-        <Link href="/import" className="button">
-          Import a document
-        </Link>
-      </div>
+      <VaultList />
 
       <h2 className="section-title">How much each source proves</h2>
       <ul className="sources">
