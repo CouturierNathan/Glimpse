@@ -1,6 +1,14 @@
 'use client'
 
-import type { DocumentReference, ExtractedClaim, SourceClass } from '@glimpse/shared'
+import type {
+  DocumentReference,
+  EncryptedRecord,
+  ExtractedClaim,
+  KeyEnvelope,
+  ShareGrant,
+  SourceClass,
+  VerificationRequest,
+} from '@glimpse/shared'
 import {
   decryptItem,
   type EncryptionIdentity,
@@ -10,6 +18,7 @@ import {
   type ItemExpectation,
   packEncryptedItem,
   verifyEncryptedItem,
+  wrapForRequester,
 } from '@glimpse/vault'
 import {
   createContext,
@@ -45,6 +54,25 @@ interface VaultContextValue {
   /** Downloads, checks and decrypts one item in the browser. */
   open: (item: VaultItem) => Promise<ExtractedClaim>
   remove: (item: VaultItem) => Promise<void>
+  /** This browser's encryption identity: a requester names it so the item is wrapped for it. */
+  identity: () => Promise<EncryptionIdentity>
+  /** Consents to a request with one item: wraps its key for the requester, in this browser. */
+  share: (requestId: string, item: VaultItem) => Promise<void>
+  refuse: (requestId: string) => Promise<void>
+  withdraw: (requestId: string) => Promise<void>
+  /** For the requester: downloads and decrypts what the holder shared. Verification is separate. */
+  receive: (requestId: string) => Promise<{ request: VerificationRequest; claim: ExtractedClaim }>
+}
+
+const json = (body: unknown): RequestInit => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+})
+
+function fromBase64url(text: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(text.replace(/-/g, '+').replace(/_/g, '/'))
+  return Uint8Array.from(binary, (c) => c.charCodeAt(0))
 }
 
 const VaultContext = createContext<VaultContextValue | null>(null)
@@ -211,5 +239,91 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     [request],
   )
 
-  return <VaultContext value={{ items, request, store, open, remove }}>{children}</VaultContext>
+  const share = useCallback(
+    async (requestId: string, item: VaultItem): Promise<void> => {
+      const holder = await keys()
+      const decided = await request(
+        `/api/requests/${requestId}/decision`,
+        json({ outcome: 'allow', reference: item.reference }),
+      )
+      const { grant, recipient } = (await decided.json()) as {
+        grant: ShareGrant
+        recipient: { recipientId: string; recipientKeyId: string; publicKey: string }
+      }
+      const publicKey = await crypto.subtle.importKey(
+        'spki',
+        fromBase64url(recipient.publicKey),
+        { name: 'RSA-OAEP', hash: 'SHA-256' },
+        true,
+        ['wrapKey'],
+      )
+      const res = await request(`/api/vault/items/${item.reference}`)
+      const packed = await verifyEncryptedItem(new Uint8Array(await res.arrayBuffer()), item.digest)
+      const own = packed.envelopes.find((e) => e.recipientKeyId === holder.recipientKeyId)
+      if (!own) throw new Error('This item was encrypted for another key.')
+      const envelope = await wrapForRequester(packed.record, own, holder, item.expected, grant, {
+        recipientId: recipient.recipientId,
+        recipientKeyId: recipient.recipientKeyId,
+        publicKey,
+      })
+      // The requester checks what it decrypts against these creation-time pins.
+      await request(
+        `/api/requests/${requestId}/envelope`,
+        json({ envelope, expected: { ...item.expected, grantId: grant.grantId } }),
+      )
+    },
+    [keys, request],
+  )
+
+  const refuse = useCallback(
+    async (requestId: string): Promise<void> => {
+      await request(`/api/requests/${requestId}/decision`, json({ outcome: 'deny' }))
+    },
+    [request],
+  )
+
+  const withdraw = useCallback(
+    async (requestId: string): Promise<void> => {
+      await request(`/api/requests/${requestId}/share`, { method: 'DELETE' })
+    },
+    [request],
+  )
+
+  const receive = useCallback(
+    async (requestId: string) => {
+      const me = await keys()
+      const res = await request(`/api/requests/${requestId}/share`)
+      const shared = (await res.json()) as {
+        record: EncryptedRecord
+        envelope: KeyEnvelope
+        expected: ItemExpectation
+        request: VerificationRequest
+      }
+      if (shared.envelope.recipientKeyId !== me.recipientKeyId) {
+        throw new Error('This request was made before the page was reloaded. Create a new one.')
+      }
+      const claim = await decryptItem(shared.record, shared.envelope, me, shared.expected)
+      return { request: shared.request, claim }
+    },
+    [keys, request],
+  )
+
+  return (
+    <VaultContext
+      value={{
+        items,
+        request,
+        store,
+        open,
+        remove,
+        identity: keys,
+        share,
+        refuse,
+        withdraw,
+        receive,
+      }}
+    >
+      {children}
+    </VaultContext>
+  )
 }

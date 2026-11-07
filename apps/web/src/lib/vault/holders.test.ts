@@ -27,6 +27,15 @@ test('find stays null until the holder registers a key', () => {
   assert.equal(registry.find(BOB, 1), null)
 })
 
+test('publicKey finds a registered key by holder and key id', () => {
+  const registry = new HolderRegistry()
+  const holderId = registry.ensure(ALICE, 1)
+  registry.registerKey(ALICE, 1, key(1), 'pk1')
+  assert.equal(registry.publicKey(holderId, key(1)), 'pk1')
+  assert.equal(registry.publicKey(holderId, key(2)), null)
+  assert.equal(registry.publicKey('f'.repeat(32), key(1)), null)
+})
+
 test('registerKey refuses unknown holders, bad ids and rebinding an id', () => {
   const registry = new HolderRegistry()
   assert.throws(() => registry.registerKey(ALICE, 1, key(1), 'pk'), HolderKeyError)

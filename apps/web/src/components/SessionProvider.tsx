@@ -28,7 +28,8 @@ export function useSession(): SessionContextValue {
   return value
 }
 
-async function connectedAddress(): Promise<Address> {
+/** The wallet's address, connecting it first if needed. */
+export async function connectedAddress(): Promise<Address> {
   const connection = getConnection(wagmiConfig)
   if (connection.status === 'connected') return connection.address
   const [connector] = wagmiConfig.connectors
@@ -37,7 +38,8 @@ async function connectedAddress(): Promise<Address> {
   return accounts[0]
 }
 
-function describe(error: unknown): string {
+/** A wallet error in words the user can act on. */
+export function describeWalletError(error: unknown): string {
   if (error instanceof ProviderNotFoundError) {
     return 'No browser wallet found. Install MetaMask or another Ethereum wallet.'
   }
@@ -94,7 +96,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setAddress(body.address)
       setStatus('signed-in')
     } catch (err) {
-      setError(describe(err))
+      setError(describeWalletError(err))
       setStatus('signed-out')
     }
   }, [])

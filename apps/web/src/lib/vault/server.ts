@@ -6,6 +6,8 @@ import type { AuthenticatedHolder, ExtractionModel, StorageBackend } from '@glim
 import { getSession } from '@/lib/auth/server.ts'
 import type { Session } from '@/lib/auth/session.ts'
 
+import { RequestStore } from '@/lib/requests.ts'
+
 import { importAttributes } from './attributes.ts'
 import { signedOut, vaultLocked } from './http.ts'
 import { ExtractionConsentStore } from './consents.ts'
@@ -17,11 +19,13 @@ type VaultServer = typeof VaultServerModule
 const shared = globalThis as {
   glimpseHolders?: HolderRegistry
   glimpseConsents?: ExtractionConsentStore
+  glimpseRequests?: RequestStore
   glimpseVaultServer?: Promise<VaultServer>
   glimpseVaultBackend?: Promise<StorageBackend>
 }
 export const holders = (shared.glimpseHolders ??= new HolderRegistry())
 export const consents = (shared.glimpseConsents ??= new ExtractionConsentStore())
+export const requests = (shared.glimpseRequests ??= new RequestStore())
 
 /**
  * The vault's server module, loaded by Node at run time rather than bundled: Turbopack cannot
@@ -57,13 +61,14 @@ export function holderOf(session: Session): AuthenticatedHolder | null {
 
 /** The request's holder, or the response that tells the browser what to do about it. */
 export async function requireHolder(): Promise<
-  { holder: AuthenticatedHolder; failure?: never } | { holder?: never; failure: Response }
+  | { holder: AuthenticatedHolder; session: Session; failure?: never }
+  | { holder?: never; session?: never; failure: Response }
 > {
   const session = await getSession()
   if (!session) return { failure: signedOut() }
   const holder = holderOf(session)
   if (!holder) return { failure: vaultLocked() }
-  return { holder }
+  return { holder, session }
 }
 
 async function authenticate(): Promise<AuthenticatedHolder | null> {
@@ -92,5 +97,18 @@ export async function extractionService() {
     readConsent: (holderId, documentId) => Promise.resolve(consents.read(holderId, documentId)),
     attributes: importAttributes.map(({ attribute, label, type }) => ({ attribute, label, type })),
     model: extractionModel(vault),
+  })
+}
+
+/**
+ * Grants, key envelopes and revocation markers for consented shares. Every step reads the
+ * holder's live answer from the request store, never from the request body.
+ */
+export async function shareService() {
+  const { createShareService } = await vaultServer()
+  return createShareService({
+    backend: await backend(),
+    authenticate,
+    readDecision: (requestId) => Promise.resolve(requests.readDecision(requestId)),
   })
 }

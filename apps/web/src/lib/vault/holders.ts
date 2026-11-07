@@ -52,6 +52,14 @@ export class HolderRegistry {
     return { holderId: holder.holderId, encryptionKeyIds: [...holder.keys.keys()] }
   }
 
+  /** A registered public key, so a holder can wrap an item key for this recipient. */
+  publicKey(holderId: string, keyId: string): string | null {
+    for (const holder of this.#holders.values()) {
+      if (holder.holderId === holderId) return holder.keys.get(keyId) ?? null
+    }
+    return null
+  }
+
   registerKey(address: string, chainId: number, keyId: string, publicKey: string): void {
     if (!OPAQUE_ID.test(keyId)) throw new HolderKeyError('Invalid key id')
     const holder = this.#holders.get(this.#walletKey(address, chainId))

@@ -871,3 +871,150 @@ a {
     gap: 0.4rem;
   }
 }
+
+/* ---------- Requests ---------- */
+
+.form textarea,
+.link {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 0.6rem;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.form textarea {
+  resize: vertical;
+}
+
+.link {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.875rem;
+}
+
+.link-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.link-row .link {
+  flex: 1;
+  min-width: 0;
+}
+
+.open-request {
+  margin-top: 1.5rem;
+}
+
+.open-request label {
+  font-weight: 700;
+}
+
+.request-status,
+.request-review {
+  max-width: 40rem;
+  margin-top: 2.5rem;
+}
+
+.request-status h2,
+.outcome h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.35rem;
+}
+
+.verdict h2 {
+  margin-top: 1rem;
+  font-size: 1.75rem;
+}
+
+.checks {
+  display: grid;
+  margin: 1.25rem 0;
+}
+
+.checks > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.checks dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.checks [data-outcome='pass'] dd {
+  color: var(--tint);
+}
+
+.checks [data-outcome='fail'] dd {
+  color: var(--error);
+}
+
+.checks [data-outcome='unknown'] dd {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+.request-facts {
+  display: grid;
+  margin: 0 0 1.5rem;
+}
+
+.request-facts > div {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.request-facts dt {
+  color: var(--ink-soft);
+}
+
+.request-facts dd {
+  margin: 0;
+}
+
+.purpose {
+  font-style: italic;
+}
+
+.choices {
+  margin-bottom: 1rem;
+}
+
+.choice {
+  align-items: center;
+}
+
+.choice span:first-of-type {
+  flex: 1;
+  font-weight: 700;
+}
+
+.empty-inline {
+  margin-bottom: 1rem;
+}
+
+.empty-inline p {
+  margin: 0 0 1rem;
+}
+
+.outcome {
+  margin: 0;
+}
+
+@media (max-width: 36rem) {
+  .request-facts > div {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+}
