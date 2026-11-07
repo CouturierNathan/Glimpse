@@ -29,7 +29,11 @@ let other: AuthenticatedHolder
 let encrypted: EncryptedItem
 const claim = parseContract('ExtractedClaim', fixtures.valid.ExtractedClaim)
 const input = () => ({ record: encrypted.record, envelopes: [encrypted.envelope] })
-const expected = () => ({ ...encrypted.record, grantId: encrypted.envelope.grantId })
+const expected = () => ({
+  ...encrypted.record,
+  grantId: encrypted.envelope.grantId,
+  recordDigest: encrypted.recordDigest,
+})
 const errorCode = (code: string) => (error: unknown) =>
   error instanceof StorageError && error.code === code
 before(async () => {
@@ -185,7 +189,7 @@ for (const adapter of ['files', 'memory'] as const) {
       await assert.rejects(store.get(ref), errorCode('CORRUPT'))
     }
   })
-  test(`${adapter}: syntactically valid cryptographic corruption reaches GCM and is rejected`, async (t) => {
+  test(`${adapter}: syntactically valid cryptographic corruption fails the trusted record fingerprint`, async (t) => {
     const backend =
       adapter === 'files' ? (await fileBackend(t)).backend : createMemoryStorageBackendForTests()
     const store = bind(backend)
@@ -204,7 +208,7 @@ for (const adapter of ['files', 'memory'] as const) {
     const saved = await store.get(ref)
     assert.ok(saved)
     await assert.rejects(decryptItem(saved.record, saved.envelopes[0], identity, expected()), {
-      name: 'OperationError',
+      name: 'IntegrityError',
     })
   })
 }

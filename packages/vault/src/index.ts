@@ -1,3 +1,4 @@
+import { fingerprintRecord, assertRecordFingerprint } from './integrity.ts'
 import {
   assertClaimProvenance,
   envelopeLabel,
@@ -32,8 +33,11 @@ export interface EncryptOptions {
   grantId: OpaqueId
 }
 export type EnvelopeExpectation = Pick<KeyEnvelope, 'itemId' | 'itemVersion' | 'keyId' | 'grantId'>
-export type ItemExpectation = EnvelopeExpectation & Pick<EncryptedRecord, 'sourceClass'>
+export type ItemExpectation = EnvelopeExpectation &
+  Pick<EncryptedRecord, 'sourceClass'> & { recordDigest: string }
 export interface EncryptedItem {
+  /** Creation-time client pin. Never replace it with a digest supplied by storage. */
+  recordDigest: string
   record: EncryptedRecord
   envelope: KeyEnvelope
 }
@@ -156,7 +160,9 @@ async function encryptPayload(
     grantId: options.grantId,
     algorithm: 'RSA-OAEP-256',
     wrappedKey: encode(
-      new Uint8Array((holder.publicKey.algorithm as RsaHashedKeyAlgorithm).modulusLength / 8),
+      new Uint8Array(
+        Math.ceil((holder.publicKey.algorithm as RsaHashedKeyAlgorithm).modulusLength / 8),
+      ),
     ),
     labelVersion: '1',
   })
@@ -182,8 +188,13 @@ async function encryptPayload(
       name: 'RSA-OAEP',
       label: new Uint8Array(envelopeLabel(envelope)),
     })
+    const finalRecord = parseContract('EncryptedRecord', {
+      ...record,
+      ciphertext: encode(ciphertext),
+    })
     return {
-      record: parseContract('EncryptedRecord', { ...record, ciphertext: encode(ciphertext) }),
+      recordDigest: await fingerprintRecord(finalRecord),
+      record: finalRecord,
       envelope: parseContract('KeyEnvelope', { ...envelope, wrappedKey: encode(wrappedKey) }),
     }
   } finally {
@@ -227,7 +238,7 @@ async function unwrapEnvelope(
   const wrapped = decode(envelope.wrappedKey)
   if (
     wrapped.byteLength !==
-    (holder.privateKey.algorithm as RsaHashedKeyAlgorithm).modulusLength / 8
+    Math.ceil((holder.privateKey.algorithm as RsaHashedKeyAlgorithm).modulusLength / 8)
   ) {
     throw new TypeError('Invalid wrapped key length')
   }
@@ -279,6 +290,7 @@ async function decryptPayload(
 ): Promise<unknown> {
   const record = parseContract('EncryptedRecord', recordInput)
   const context = { ...expected }
+  await assertRecordFingerprint(record, context.recordDigest)
   if (
     record.itemId !== context.itemId ||
     record.itemVersion !== context.itemVersion ||
@@ -348,7 +360,9 @@ export async function wrapForRequester(
     grantId: grant.grantId,
     algorithm: 'RSA-OAEP-256',
     wrappedKey: encode(
-      new Uint8Array((recipient.publicKey.algorithm as RsaHashedKeyAlgorithm).modulusLength / 8),
+      new Uint8Array(
+        Math.ceil((recipient.publicKey.algorithm as RsaHashedKeyAlgorithm).modulusLength / 8),
+      ),
     ),
     labelVersion: '1',
   })
@@ -368,3 +382,12 @@ export function assertLiveGrant(grant: ShareGrant, now = Date.now()): void {
     throw new Error('Grant inactive')
   }
 }
+
+export {
+  fingerprintRecord,
+  fingerprintBytes,
+  packEncryptedItem,
+  verifyEncryptedItem,
+  IntegrityError,
+} from './integrity.ts'
+export type { PackedItem } from './integrity.ts'

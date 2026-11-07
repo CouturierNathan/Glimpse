@@ -11,6 +11,8 @@ import {
   wrapForRequester,
   encryptAttestation,
   decryptAttestation,
+  packEncryptedItem,
+  verifyEncryptedItem,
 } from '@glimpse/vault'
 import {
   createPrivateExtractionService,
@@ -68,17 +70,20 @@ try {
   })
   const backend = await createFileStorageBackend({ directory: root })
   const vault = createVaultStorage({ backend, authenticate })
-  const reference = await vault.put({ record: item.record, envelopes: [item.envelope] })
+  const packed = await packEncryptedItem({ record: item.record, envelopes: [item.envelope] })
+  const reference = await vault.putBytes(packed.bytes)
   const reopened = createVaultStorage({
     backend: await createFileStorageBackend({ directory: root }),
     authenticate,
   })
-  const stored = await reopened.get(reference)
-  assert.ok(stored)
+  const downloaded = await reopened.getBytes(reference)
+  assert.ok(downloaded)
+  const stored = await verifyEncryptedItem(downloaded, packed.digest)
   assert.deepEqual(
     await decryptItem(stored.record, stored.envelopes[0], owner, {
       ...item.record,
       grantId: item.envelope.grantId,
+      recordDigest: item.recordDigest,
     }),
     claim,
   )
@@ -102,7 +107,7 @@ try {
     item.record,
     item.envelope,
     owner,
-    { ...item.record, grantId: item.envelope.grantId },
+    { ...item.record, grantId: item.envelope.grantId, recordDigest: item.recordDigest },
     ticket.grant,
     requester,
   )
@@ -113,6 +118,7 @@ try {
     await decryptItem(delivery.record, delivery.envelope, requester, {
       ...delivery.record,
       grantId: delivery.grant.grantId,
+      recordDigest: item.recordDigest,
     }),
     claim,
   )
@@ -130,6 +136,7 @@ try {
     await decryptAttestation(encryptedC.record, encryptedC.envelope, owner, {
       ...encryptedC.record,
       grantId: encryptedC.envelope.grantId,
+      recordDigest: encryptedC.recordDigest,
     }),
     attestation,
   )
