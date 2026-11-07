@@ -398,13 +398,6 @@ a {
   font-size: 0.875rem;
 }
 
-.doc-foot svg {
-  flex: none;
-  width: 1.25rem;
-  height: 1.25rem;
-  color: var(--tint);
-}
-
 /* ---------- Source classes ---------- */
 
 .sources {
@@ -727,7 +720,7 @@ a {
 
 .claims li {
   display: grid;
-  grid-template-columns: 1.1rem 1fr auto;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 0;
@@ -772,7 +765,12 @@ a {
   display: grid;
 }
 
-.item-name span {
+.item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  margin-top: 0.3rem;
   color: var(--ink-soft);
   font-size: 0.875rem;
   letter-spacing: 0.01em;
@@ -799,5 +797,77 @@ a {
 
   .item-actions {
     grid-column: 2 / -1;
+  }
+}
+
+/* ---------- Status badges ---------- */
+
+.status {
+  --status: var(--ink-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.6rem 0.1rem 0.4rem;
+  border: 1.5px solid var(--status);
+  border-radius: 999px;
+  color: var(--status);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.status svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.status[data-status='authentic'] {
+  --status: var(--tint);
+  background: var(--tint-wash);
+}
+
+.status[data-status='expired'] {
+  border-style: dashed;
+}
+
+.status[data-status='revoked'] {
+  --status: var(--error);
+}
+
+.status[data-status='undetermined'] {
+  border-style: dotted;
+}
+
+.legend {
+  display: grid;
+  max-width: 44rem;
+  margin: 1rem 0 0;
+}
+
+.legend > div {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.legend dd {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 36rem) {
+  .legend > div {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
   }
 }

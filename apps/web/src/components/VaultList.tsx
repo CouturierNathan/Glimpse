@@ -4,8 +4,10 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 import { formatClaimValue } from '@/lib/format.ts'
+import { holderStatus } from '@/lib/status.ts'
 import { attributeName } from '@/lib/vault/attributes.ts'
 
+import { StatusBadge } from './StatusBadge.tsx'
 import { useVault, type VaultItem } from './VaultProvider.tsx'
 
 const markClass = { A: 'mark', B: 'mark signed', C: 'mark attested' } as const
@@ -31,7 +33,10 @@ function Row({ item }: { item: VaultItem }) {
       <span className={markClass[item.sourceClass]} aria-hidden="true" />
       <div className="item-name">
         <strong>{attributeName(item.attribute)}</strong>
-        <span>{sourceName[item.sourceClass]}</span>
+        <span className="item-meta">
+          <StatusBadge status={holderStatus(item.sourceClass)} />
+          {sourceName[item.sourceClass]}
+        </span>
       </div>
       <div className="item-value" aria-live="polite">
         {value ?? <span className="redacted" aria-label="Encrypted" />}
