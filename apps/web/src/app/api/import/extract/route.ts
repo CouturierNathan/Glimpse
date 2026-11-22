@@ -1,5 +1,7 @@
+import type { DocumentReference, ExtractedClaim, IdentityValidationReport } from '@glimpse/shared'
 import { NextResponse } from 'next/server'
 
+import { identityReports, validateSignedPdf } from '@/lib/identity/server.ts'
 import { readUploadRequest } from '@/lib/vault/attributes.ts'
 import { errorResponse, noStore, readLimitedBody, vaultErrorResponse } from '@/lib/vault/http.ts'
 import { consents, extractionService, requireHolder } from '@/lib/vault/server.ts'
@@ -51,9 +53,11 @@ export async function POST(request: Request) {
     const bytes = new Uint8Array(await file.arrayBuffer())
     const service = await extractionService()
 
-    let claims
+    let claims: ExtractedClaim[]
+    let report: IdentityValidationReport | null = null
     if (upload.mediaType === 'application/pdf') {
       claims = await service.extractPdf(bytes, metadata, names)
+      report = await validateSignedPdf(bytes)
     } else {
       let pages
       try {
@@ -64,7 +68,22 @@ export async function POST(request: Request) {
       if (pages.length > MAX_PAGES) return errorResponse(413, 'The document has too many pages.')
       claims = await service.extract({ ...metadata, pages }, names)
     }
-    return NextResponse.json({ claims }, { headers: noStore })
+    // The extractor always says class A. Only a signature this server verified makes the claims
+    // class B, with the report as evidence; nothing here can make them class C.
+    let source: DocumentReference = {
+      documentId,
+      documentVersion: upload.documentVersion,
+      provenance: { class: 'A' },
+    }
+    if (report?.indication === 'TOTAL_PASSED') {
+      identityReports.add(holder.holderId, report)
+      source = {
+        ...source,
+        provenance: { class: 'B', signatureVerificationId: report.reportId },
+      }
+      claims = claims.map((claim) => ({ ...claim, document: source }))
+    }
+    return NextResponse.json({ claims, source, report }, { headers: noStore })
   } catch (error) {
     return vaultErrorResponse(error)
   } finally {
