@@ -22,7 +22,7 @@ type Step =
   | { name: 'idle' }
   | { name: 'reading' }
   | { name: 'encrypting' }
-  | { name: 'done'; stored: ExtractedClaim[]; missing: string[] }
+  | { name: 'done'; stored: ExtractedClaim[]; missing: string[]; signed: boolean }
   | { name: 'error'; message: string; signedOut: boolean }
 
 export function ImportPanel() {
@@ -45,7 +45,7 @@ export function ImportPanel() {
       attributes,
     }
     // Set here, before any extraction: an imported document is class A, whatever the model says.
-    const source: DocumentReference = {
+    let source: DocumentReference = {
       documentId: upload.documentId,
       documentVersion: upload.documentVersion,
       provenance: { class: 'A' },
@@ -61,7 +61,16 @@ export function ImportPanel() {
         body: JSON.stringify(upload),
       })
       const res = await post('/api/import/extract', { body: form })
-      const { claims } = (await res.json()) as { claims: ExtractedClaim[] }
+      const verified = (await res.json()) as { claims: ExtractedClaim[]; source: DocumentReference }
+      const { claims } = verified
+      // Only the server's own signature check upgrades this document, and only to class B.
+      if (
+        verified.source.provenance.class === 'B' &&
+        verified.source.documentId === source.documentId &&
+        verified.source.documentVersion === source.documentVersion
+      ) {
+        source = verified.source
+      }
 
       setStep({ name: 'encrypting' })
       for (const claim of claims) await store(claim, source)
@@ -70,6 +79,7 @@ export function ImportPanel() {
         name: 'done',
         stored: claims,
         missing: attributes.filter((a) => !found.has(a)),
+        signed: source.provenance.class === 'B',
       })
     } catch (error) {
       setStep({
@@ -97,6 +107,12 @@ export function ImportPanel() {
             </li>
           ))}
         </ul>
+        {step.signed && (
+          <p className="hint">
+            The document&apos;s signature was verified against a trusted authority: these attributes
+            are marked as coming from a signed document.
+          </p>
+        )}
         {step.missing.length > 0 && (
           <p className="hint">
             Not found in this document: {step.missing.map(attributeName).join(', ')}.
