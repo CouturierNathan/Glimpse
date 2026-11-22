@@ -32,7 +32,7 @@ export async function POST(request: Request, { params }: Context) {
   const { requestId } = await params
   try {
     const stored = findRequest(requestId)
-    if (stored.holderId !== holder.holderId || !stored.shareReference) {
+    if (stored.decision?.holderId !== holder.holderId || !stored.shareReference) {
       throw new RequestError(409, 'Nothing to share for this request.')
     }
     const body = (await readJson(request)) as { envelope?: unknown; expected?: unknown }

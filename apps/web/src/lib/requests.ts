@@ -1,4 +1,9 @@
-import { isContract, parseContract, type VerificationRequest } from '@glimpse/shared'
+import {
+  type AccessDecision,
+  isContract,
+  parseContract,
+  type VerificationRequest,
+} from '@glimpse/shared'
 import type { ItemExpectation } from '@glimpse/vault'
 import type { ConsentDecision } from '@glimpse/vault/server'
 import { requestDomain, requestMessage, requestTypes } from '@glimpse/verifier'
@@ -15,10 +20,8 @@ export type RequestState = 'pending' | 'refused' | 'allowed' | 'shared' | 'withd
 export interface StoredRequest {
   request: VerificationRequest
   state: RequestState
-  /** Set once the holder answers: whose item it is and which one. */
-  holderId?: string
-  itemId?: string
-  itemVersion?: number
+  /** Set once the holder answers, replaced by a deny if the holder withdraws. */
+  decision?: AccessDecision
   shareReference?: string
   /** The holder's creation-time pins, relayed so the requester can check what it decrypts. */
   expected?: ItemExpectation
@@ -98,6 +101,52 @@ export async function validateRequest(
   return request
 }
 
+type Answer =
+  | { outcome: 'deny'; reason?: AccessDecision['reason'] }
+  | { outcome: 'allow'; itemId: string; itemVersion: number }
+
+/** The holder's answer as the shared AccessDecision contract, checked like any wire value. */
+function decisionFor(
+  request: VerificationRequest,
+  holderId: string,
+  answer: Answer,
+  now: number,
+): AccessDecision {
+  return parseContract('AccessDecision', {
+    schemaVersion: '1.0.0',
+    holderId,
+    consentRequestId: request.requestId,
+    recipientId: request.recipientId,
+    recipientKeyId: request.recipientKeyId,
+    decidedAt: new Date(now).toISOString(),
+    expiresAt: request.expiresAt,
+    ...(answer.outcome === 'deny'
+      ? { outcome: 'deny', reason: answer.reason ?? 'holder-refused' }
+      : answer),
+  })
+}
+
+/** B's share service reads this shape; only an allow naming one item version maps to it. */
+export function toConsentDecision(decision: AccessDecision): ConsentDecision | null {
+  if (
+    decision.outcome !== 'allow' ||
+    decision.itemId === undefined ||
+    decision.itemVersion === undefined
+  ) {
+    return null
+  }
+  return {
+    outcome: 'allow',
+    holderId: decision.holderId,
+    recipientId: decision.recipientId,
+    recipientKeyId: decision.recipientKeyId,
+    itemId: decision.itemId,
+    itemVersion: decision.itemVersion,
+    consentRequestId: decision.consentRequestId,
+    expiresAt: decision.expiresAt,
+  }
+}
+
 /** Requests and the holders' answers, in memory: a server restart forgets them. */
 export class RequestStore {
   readonly #requests = new Map<string, StoredRequest>()
@@ -120,26 +169,15 @@ export class RequestStore {
   }
 
   /** The holder answers once. A refusal is final; so is a consent. */
-  decide(
-    requestId: string,
-    holderId: string,
-    answer: { outcome: 'deny' } | { outcome: 'allow'; itemId: string; itemVersion: number },
-    now = Date.now(),
-  ): StoredRequest {
+  decide(requestId: string, holderId: string, answer: Answer, now = Date.now()): StoredRequest {
     const stored = this.get(requestId, now)
     if (!stored) throw new RequestError(404, 'This request does not exist.')
     if (stored.state === 'expired') throw new RequestError(410, 'This request has expired.')
     if (stored.state !== 'pending') {
       throw new RequestError(409, 'This request was already answered.')
     }
-    stored.holderId = holderId
-    if (answer.outcome === 'deny') {
-      stored.state = 'refused'
-    } else {
-      stored.state = 'allowed'
-      stored.itemId = answer.itemId
-      stored.itemVersion = answer.itemVersion
-    }
+    stored.decision = decisionFor(stored.request, holderId, answer, now)
+    stored.state = answer.outcome === 'deny' ? 'refused' : 'allowed'
     return stored
   }
 
@@ -148,33 +186,14 @@ export class RequestStore {
     const stored = this.#requests.get(requestId)
     if (stored?.state !== 'allowed' || stored.shareReference) return
     stored.state = 'pending'
-    delete stored.holderId
-    delete stored.itemId
-    delete stored.itemVersion
+    delete stored.decision
   }
 
   /** The live consent the share service checks on every step, never taken from a request body. */
   readDecision(requestId: string): ConsentDecision | null {
     const stored = this.#requests.get(requestId)
-    if (
-      !stored ||
-      (stored.state !== 'allowed' && stored.state !== 'shared') ||
-      !stored.holderId ||
-      !stored.itemId ||
-      stored.itemVersion === undefined
-    ) {
-      return null
-    }
-    return {
-      outcome: 'allow',
-      holderId: stored.holderId,
-      recipientId: stored.request.recipientId,
-      recipientKeyId: stored.request.recipientKeyId,
-      itemId: stored.itemId,
-      itemVersion: stored.itemVersion,
-      consentRequestId: requestId,
-      expiresAt: stored.request.expiresAt,
-    }
+    if (!stored?.decision || (stored.state !== 'allowed' && stored.state !== 'shared')) return null
+    return toConsentDecision(stored.decision)
   }
 
   authorized(requestId: string, shareReference: string): void {
@@ -192,10 +211,16 @@ export class RequestStore {
   }
 
   /** The holder takes the consent back: the requester can no longer download the item. */
-  withdraw(requestId: string): void {
+  withdraw(requestId: string, now = Date.now()): void {
     const stored = this.#requests.get(requestId)
-    if (stored && (stored.state === 'allowed' || stored.state === 'shared')) {
+    if (stored?.decision && (stored.state === 'allowed' || stored.state === 'shared')) {
       stored.state = 'withdrawn'
+      stored.decision = decisionFor(
+        stored.request,
+        stored.decision.holderId,
+        { outcome: 'deny', reason: 'consent-withdrawn' },
+        now,
+      )
     }
   }
 }

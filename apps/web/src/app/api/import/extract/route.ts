@@ -1,16 +1,20 @@
 import { NextResponse } from 'next/server'
 
-import { documentKinds } from '@/lib/vault/attributes.ts'
+import { readUploadRequest } from '@/lib/vault/attributes.ts'
 import { errorResponse, noStore, readLimitedBody, vaultErrorResponse } from '@/lib/vault/http.ts'
 import { consents, extractionService, requireHolder } from '@/lib/vault/server.ts'
 
-const OPAQUE_ID = /^[0-9a-f]{32}$/
 /** The extraction service accepts PDFs up to 5 MiB; the rest is multipart overhead. */
 const MAX_BODY_BYTES = 5 * 1024 * 1024 + 64 * 1024
 const MAX_PAGES = 12
-const kinds = new Set<string>(documentKinds.map((k) => k.kind))
 
-type Kind = (typeof documentKinds)[number]['kind']
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
 
 /** A text document, one page per form feed. */
 function textPages(bytes: Uint8Array) {
@@ -19,8 +23,9 @@ function textPages(bytes: Uint8Array) {
 }
 
 /**
- * Reads the consented attributes from a document. The text is processed in memory and never
- * stored; only the extracted claims go back to the browser, which encrypts them itself.
+ * Reads the consented attributes from a document, described by the shared DocumentUploadRequest
+ * in the `request` part. The text is processed in memory and never stored; only the extracted
+ * claims go back to the browser, which encrypts them itself.
  */
 export async function POST(request: Request) {
   const { holder, failure } = await requireHolder()
@@ -34,28 +39,20 @@ export async function POST(request: Request) {
     })
       .formData()
       .catch(() => null)
-    const id = form?.get('documentId')
-    const kind = form?.get('kind')
+    const part = form?.get('request')
     const file = form?.get('file')
-    const attributes = form?.getAll('attributes')
-    if (
-      typeof id !== 'string' ||
-      !OPAQUE_ID.test(id) ||
-      typeof kind !== 'string' ||
-      !kinds.has(kind) ||
-      !(file instanceof File) ||
-      !attributes?.every((a) => typeof a === 'string')
-    ) {
+    const upload = typeof part === 'string' ? readUploadRequest(parseJson(part)) : null
+    if (!upload || !(file instanceof File)) {
       return errorResponse(400, 'Choose a document, its type and the attributes to extract.')
     }
-    documentId = id
-    const names = attributes as string[]
-    const metadata = { documentId, documentVersion: 1, kind: kind as Kind }
+    documentId = upload.documentId
+    const names = upload.attributes
+    const metadata = { documentId, documentVersion: upload.documentVersion, kind: upload.kind }
     const bytes = new Uint8Array(await file.arrayBuffer())
     const service = await extractionService()
 
     let claims
-    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+    if (upload.mediaType === 'application/pdf') {
       claims = await service.extractPdf(bytes, metadata, names)
     } else {
       let pages

@@ -1,11 +1,17 @@
 'use client'
 
-import type { DocumentReference, ExtractedClaim } from '@glimpse/shared'
+import type { DocumentReference, DocumentUploadRequest, ExtractedClaim } from '@glimpse/shared'
 import { generateOpaqueId } from '@glimpse/vault'
 import Link from 'next/link'
 import { type FormEvent, useState } from 'react'
 
-import { attributeName, documentKinds, importAttributes } from '@/lib/vault/attributes.ts'
+import {
+  attributeName,
+  documentKinds,
+  type DocumentKind,
+  importAttributes,
+  uploadMediaType,
+} from '@/lib/vault/attributes.ts'
 import { formatClaimValue } from '@/lib/format.ts'
 import { holderStatus } from '@/lib/status.ts'
 
@@ -27,18 +33,32 @@ export function ImportPanel() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const form = new FormData(event.currentTarget)
-    const attributes = form.getAll('attributes').map(String)
-    const documentId = generateOpaqueId()
+    const fields = new FormData(event.currentTarget)
+    const file = fields.get('file') as File
+    const attributes = fields.getAll('attributes').map(String)
+    const upload: DocumentUploadRequest = {
+      schemaVersion: '1.0.0',
+      documentId: generateOpaqueId(),
+      documentVersion: 1,
+      kind: String(fields.get('kind')) as DocumentKind,
+      mediaType: uploadMediaType(file),
+      attributes,
+    }
     // Set here, before any extraction: an imported document is class A, whatever the model says.
-    const source: DocumentReference = { documentId, documentVersion: 1, provenance: { class: 'A' } }
-    form.set('documentId', documentId)
+    const source: DocumentReference = {
+      documentId: upload.documentId,
+      documentVersion: upload.documentVersion,
+      provenance: { class: 'A' },
+    }
+    const form = new FormData()
+    form.set('request', JSON.stringify(upload))
+    form.set('file', file)
 
     try {
       setStep({ name: 'reading' })
       await post('/api/import/consent', {
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentId, attributes }),
+        body: JSON.stringify(upload),
       })
       const res = await post('/api/import/extract', { body: form })
       const { claims } = (await res.json()) as { claims: ExtractedClaim[] }
