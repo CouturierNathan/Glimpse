@@ -37,8 +37,18 @@ export async function POST(request: NextRequest) {
   })
   if (!address) return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
 
-  const expiresAt = Date.now() + SESSION_TTL_MS
-  const token = createSessionToken({ address, chainId: appChain.id, expiresAt }, getSessionSecret())
+  const issuedAt = Date.now()
+  const expiresAt = issuedAt + SESSION_TTL_MS
+  const token = createSessionToken(
+    {
+      schemaVersion: '1.0.0',
+      address,
+      chainId: appChain.id,
+      issuedAt: new Date(issuedAt).toISOString(),
+      expiresAt: new Date(expiresAt).toISOString(),
+    },
+    getSessionSecret(),
+  )
   jar.set(SESSION_COOKIE, token, { ...secureCookie, expires: expiresAt })
   return NextResponse.json({ address })
 }

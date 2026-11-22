@@ -74,21 +74,31 @@ re-encryption/key rotation creates a new version and requires new grants/envelop
 
 ## Interfaces for A and C to review
 
-Main at `8f7c9bc2204b49664ed3edc1b299f76a521d13df` has no shared A/C types.
-A's existing `Session`, `SiweExpectation`, `SiweSignIn` remain local authentication
-contracts; none is a data-sharing authorization or attestation record, so no
-parallel definition is introduced here.
+**A: AuthSession** (#2). The SIWE-authenticated wallet behind the session cookie: `address`,
+`chainId`, `issuedAt`, `expiresAt` (expires after it is issued). The cookie carries it under an
+HMAC; `SiweExpectation` and `SiweSignIn` stay local to `apps/web`.
 
-**A — AccessDecision is missing.** Expected contract to be published by A: an
-explicit allow/deny result bound to authenticated holder/actor, item ID/version,
-recipient ID, consentRequestId and grantId, decision time and stable denial reason.
-Allow must require holder ownership, authenticated recipient/key association,
-consent matching this exact item/version and recipient, current time within the
-grant lifetime, no revocation and replay protection. Missing/invalid decisions
-fail closed. B consumes this result before envelope creation or delivery; a
-ShareGrant or successful `assertShareBinding` is never sufficient authorization.
-A should review IDs/consent linkage, grant lifecycle and plaintext isolation.
-These are contract requirements for review, not a competing AccessDecision type.
+**A: DocumentUploadRequest** (#6). Sent beside each uploaded file: opaque `documentId` and
+`documentVersion`, `kind` (`synthetic`, `education`, `employment`; identity proofs never go to the
+extractor), `mediaType` (PDF or UTF-8 text) and the `attributes` the holder consents to extract
+(at least one, unique). No file name: it can name the holder.
+
+**A: AccessDecision** (#4). The holder's answer to one VerificationRequest (`consentRequestId` is
+its `requestId`), bound to `holderId`, `recipientId`, `recipientKeyId`, `decidedAt` and `expiresAt`
+(the request's expiry). `allow` names exactly one `itemId` and `itemVersion` and needs
+`decidedAt < expiresAt`; `deny` has no item and a stable `reason`: `holder-refused`,
+`consent-withdrawn` or `request-expired`. A maps an `allow` to B's `ConsentDecision`, which the
+share service reads live on every step; the grant is created from the decision, so the decision
+carries no `grantId`. Missing or non-`allow` decisions fail closed.
+
+**A: IdentityValidationReport** (#5). The result of checking a PAdES-signed PDF (France Identité
+proof). Indications and sub-indications are DSS's (`TOTAL_PASSED`, `TOTAL_FAILED`,
+`INDETERMINATE`; `HASH_FAILURE`, `SIG_CRYPTO_FAILURE`, `NO_SIGNING_CERTIFICATE_FOUND`,
+`NO_CERTIFICATE_CHAIN_FOUND`, `OUT_OF_BOUNDS_NO_POE`, `NOT_YET_VALID`, `FORMAT_FAILURE`) so a
+DSS service (`validator: "dss"`) can produce it later. Five checks (`format`, `integrity`, `signature`, `chain`, `validity`);
+`TOTAL_PASSED` needs all five to pass, the `signer` certificate and the `trustAnchor` reached
+(SHA-256 of its DER). `documentDigest` is the SHA-256 of the PDF: private, never on chain. The
+report covers the signed document only, never that the person presenting it is its holder.
 
 **C: AttestationRecord** (#14). The plaintext of a class C item: B encrypts the whole
 record as an EncryptedRecord with `sourceClass: "C"`, and a class C Provenance points
