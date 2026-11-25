@@ -53,3 +53,11 @@ npm test
 ```
 
 Working rules (branches, reviews, security): [AGENTS.md](AGENTS.md).
+
+## Documentation
+
+- [Install and run](docs/install.md)
+- [Architecture and testnet deployment](docs/architecture.md)
+- [API](docs/api.md)
+- [Security tests](docs/security-tests.md)
+- [Known limits](docs/limits.md)

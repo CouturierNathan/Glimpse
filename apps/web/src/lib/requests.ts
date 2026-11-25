@@ -9,6 +9,7 @@ import type { ConsentDecision } from '@glimpse/vault/server'
 import { requestDomain, requestMessage, requestTypes } from '@glimpse/verifier'
 import { type Address, type Hex, isAddressEqual, verifyTypedData } from 'viem'
 
+import type { Session } from './auth/session.ts'
 import { MAX_PURPOSE_LENGTH, MAX_REQUEST_LIFETIME_MS } from './request-limits.ts'
 
 /**
@@ -25,6 +26,34 @@ export interface StoredRequest {
   shareReference?: string
   /** The holder's creation-time pins, relayed so the requester can check what it decrypts. */
   expected?: ItemExpectation
+}
+
+export function isRequester(stored: StoredRequest, session: Session): boolean {
+  return stored.request.requester.toLowerCase() === session.address.toLowerCase()
+}
+
+/**
+ * What a signed-in visitor may see of a request. The requester and the holder who answered see
+ * where it stands; anyone else with the link only sees whether it can still be answered.
+ */
+export function requestView(stored: StoredRequest, session: Session, holderId: string) {
+  const { request } = stored
+  const role = isRequester(stored, session)
+    ? 'requester'
+    : stored.decision?.holderId === holderId
+      ? 'holder'
+      : 'visitor'
+  const open = stored.state === 'pending' || stored.state === 'expired'
+  return {
+    requestId: request.requestId,
+    requester: request.requester,
+    attribute: request.attribute,
+    purpose: request.purpose,
+    createdAt: request.createdAt,
+    expiresAt: request.expiresAt,
+    role,
+    state: role === 'visitor' && !open ? 'answered' : stored.state,
+  }
 }
 
 export class RequestError extends Error {
