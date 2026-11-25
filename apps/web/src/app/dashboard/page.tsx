@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { AttestationImport } from '@/components/AttestationImport.tsx'
 import { StatusLegend } from '@/components/StatusBadge.tsx'
 import { VaultList } from '@/components/VaultList.tsx'
 
@@ -15,6 +16,7 @@ export default function DashboardPage() {
       </header>
 
       <VaultList />
+      <AttestationImport />
 
       <h2 className="section-title">What each status means</h2>
       <StatusLegend />

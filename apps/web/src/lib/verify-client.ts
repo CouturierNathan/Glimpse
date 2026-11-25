@@ -1,4 +1,9 @@
-import type { ExtractedClaim, VerificationRequest, VerificationResult } from '@glimpse/shared'
+import type {
+  AttestationRecord,
+  ExtractedClaim,
+  VerificationRequest,
+  VerificationResult,
+} from '@glimpse/shared'
 import { verify } from '@glimpse/verifier'
 import { type Address, createPublicClient, http } from 'viem'
 
@@ -15,7 +20,7 @@ const answered = new Set<string>()
  */
 export function verifyShared(
   request: VerificationRequest,
-  claim: ExtractedClaim,
+  claim: ExtractedClaim | AttestationRecord,
   requester: Address,
 ): Promise<VerificationResult> {
   return verify(request, claim, {
