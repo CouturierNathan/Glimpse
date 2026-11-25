@@ -1,6 +1,7 @@
 'use client'
 
 import type {
+  AttestationRecord,
   DocumentReference,
   EncryptedRecord,
   ExtractedClaim,
@@ -10,7 +11,10 @@ import type {
   VerificationRequest,
 } from '@glimpse/shared'
 import {
+  decryptAttestation,
   decryptItem,
+  type EncryptedItem,
+  encryptAttestation,
   type EncryptionIdentity,
   encryptItem,
   generateEncryptionKeys,
@@ -51,8 +55,10 @@ interface VaultContextValue {
   request: (url: string, init?: RequestInit) => Promise<Response>
   /** Encrypts one claim in the browser and stores the ciphertext. */
   store: (claim: ExtractedClaim, source: DocumentReference) => Promise<VaultItem>
+  /** Encrypts an issuer's signed attestation (class C) in the browser and stores the ciphertext. */
+  storeAttestation: (record: AttestationRecord) => Promise<VaultItem>
   /** Downloads, checks and decrypts one item in the browser. */
-  open: (item: VaultItem) => Promise<ExtractedClaim>
+  open: (item: VaultItem) => Promise<ExtractedClaim | AttestationRecord>
   remove: (item: VaultItem) => Promise<void>
   /** This browser's encryption identity: a requester names it so the item is wrapped for it. */
   identity: () => Promise<EncryptionIdentity>
@@ -61,7 +67,9 @@ interface VaultContextValue {
   refuse: (requestId: string) => Promise<void>
   withdraw: (requestId: string) => Promise<void>
   /** For the requester: downloads and decrypts what the holder shared. Verification is separate. */
-  receive: (requestId: string) => Promise<{ request: VerificationRequest; claim: ExtractedClaim }>
+  receive: (
+    requestId: string,
+  ) => Promise<{ request: VerificationRequest; claim: ExtractedClaim | AttestationRecord }>
 }
 
 const json = (body: unknown): RequestInit => ({
@@ -73,6 +81,20 @@ const json = (body: unknown): RequestInit => ({
 function fromBase64url(text: string): Uint8Array<ArrayBuffer> {
   const binary = atob(text.replace(/-/g, '+').replace(/_/g, '/'))
   return Uint8Array.from(binary, (c) => c.charCodeAt(0))
+}
+
+type ItemOptions = Parameters<typeof encryptItem>[3]
+
+/** A class C item holds the issuer's whole signed record; the others hold an extracted claim. */
+function decrypt(
+  record: EncryptedRecord,
+  envelope: KeyEnvelope,
+  holder: EncryptionIdentity,
+  expected: ItemExpectation,
+): Promise<ExtractedClaim | AttestationRecord> {
+  return expected.sourceClass === 'C'
+    ? decryptAttestation(record, envelope, holder, expected)
+    : decryptItem(record, envelope, holder, expected)
 }
 
 const VaultContext = createContext<VaultContextValue | null>(null)
@@ -177,10 +199,13 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     [keys, signOut],
   )
 
-  const store = useCallback(
-    async (claim: ExtractedClaim, source: DocumentReference): Promise<VaultItem> => {
+  const save = useCallback(
+    async (
+      attribute: string,
+      encrypt: (holder: EncryptionIdentity, options: ItemOptions) => Promise<EncryptedItem>,
+    ): Promise<VaultItem> => {
       const holder = await keys()
-      const { record, envelope, recordDigest } = await encryptItem(claim, source, holder, {
+      const { record, envelope, recordDigest } = await encrypt(holder, {
         itemId: generateOpaqueId(),
         itemVersion: 1,
         grantId: generateOpaqueId(),
@@ -195,7 +220,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
 
       const item: VaultItem = {
         reference,
-        attribute: claim.attribute,
+        attribute,
         sourceClass: record.sourceClass,
         digest,
         expected: {
@@ -213,15 +238,27 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     [keys, request],
   )
 
+  const store = useCallback(
+    (claim: ExtractedClaim, source: DocumentReference): Promise<VaultItem> =>
+      save(claim.attribute, (holder, options) => encryptItem(claim, source, holder, options)),
+    [save],
+  )
+
+  const storeAttestation = useCallback(
+    (record: AttestationRecord): Promise<VaultItem> =>
+      save(record.attribute, (holder, options) => encryptAttestation(record, holder, options)),
+    [save],
+  )
+
   const open = useCallback(
-    async (item: VaultItem): Promise<ExtractedClaim> => {
+    async (item: VaultItem): Promise<ExtractedClaim | AttestationRecord> => {
       const holder = await keys()
       const res = await request(`/api/vault/items/${item.reference}`)
       // Check the fingerprint kept at creation before parsing anything the server returned.
       const packed = await verifyEncryptedItem(new Uint8Array(await res.arrayBuffer()), item.digest)
       const envelope = packed.envelopes.find((e) => e.recipientKeyId === holder.recipientKeyId)
       if (!envelope) throw new Error('This item was encrypted for another key.')
-      return decryptItem(packed.record, envelope, holder, item.expected)
+      return decrypt(packed.record, envelope, holder, item.expected)
     },
     [keys, request],
   )
@@ -302,7 +339,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       if (shared.envelope.recipientKeyId !== me.recipientKeyId) {
         throw new Error('This request was made before the page was reloaded. Create a new one.')
       }
-      const claim = await decryptItem(shared.record, shared.envelope, me, shared.expected)
+      const claim = await decrypt(shared.record, shared.envelope, me, shared.expected)
       return { request: shared.request, claim }
     },
     [keys, request],
@@ -314,6 +351,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         items,
         request,
         store,
+        storeAttestation,
         open,
         remove,
         identity: keys,

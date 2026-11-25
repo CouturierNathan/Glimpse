@@ -18,6 +18,7 @@ test('isActive ignores routes that only share a prefix', () => {
 
 test('safeNextPath keeps app routes', () => {
   assert.equal(safeNextPath('/import'), '/import')
+  assert.equal(safeNextPath('/issuer'), '/issuer')
 })
 
 test('safeNextPath keeps a request link', () => {

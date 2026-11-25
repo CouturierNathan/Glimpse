@@ -1,7 +1,7 @@
 import type { Route } from 'next'
 
 export interface NavItem {
-  href: '/import' | '/dashboard' | '/consent' | '/verify'
+  href: '/import' | '/dashboard' | '/consent' | '/verify' | '/issuer'
   label: string
 }
 
@@ -10,6 +10,7 @@ export const navItems: readonly NavItem[] = [
   { href: '/import', label: 'Import' },
   { href: '/consent', label: 'Requests' },
   { href: '/verify', label: 'Verify' },
+  { href: '/issuer', label: 'Issue' },
 ]
 
 /** A nav item stays active on its own sub-pages, e.g. `/import/review`. */
