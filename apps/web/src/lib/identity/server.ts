@@ -57,7 +57,12 @@ function isTestAuthority(certificate: Uint8Array): boolean {
  * before the test documents moved keeps working.
  */
 async function readBundle(path: string): Promise<string> {
-  const candidates = [resolve(path), resolve(process.cwd(), '../..', path)]
+  // The bundle is named by configuration, not by an import: told nothing, the bundler traces the
+  // whole repository into the deployed function in case one of these paths is a module.
+  const candidates = [
+    resolve(/* turbopackIgnore: true */ path),
+    resolve(/* turbopackIgnore: true */ process.cwd(), '../..', path),
+  ]
   if (basename(path) === 'FAKE-test-ca.pem') {
     candidates.push(resolve(process.cwd(), '../..', TEST_DOCUMENTS, 'FAKE-test-ca.pem'))
   }

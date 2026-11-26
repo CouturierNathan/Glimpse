@@ -4,6 +4,7 @@ contracts/artifacts/
 contracts/cache/
 contracts/types/
 .next/
+.next-*/
 next-env.d.ts
 contracts/ignition/deployments/
 # Encrypted items written by a local dev server.

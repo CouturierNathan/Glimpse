@@ -9,6 +9,8 @@ export default defineConfig([
     '**/build/',
     '**/coverage/',
     '**/.next/',
+    // NEXT_DIST_DIR lets a production build run beside a dev server; its output is generated too.
+    '**/.next-*/',
     '**/next-env.d.ts',
     'contracts/artifacts/',
     'contracts/cache/',
