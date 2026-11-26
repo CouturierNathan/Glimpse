@@ -6,16 +6,20 @@ import Link from 'next/link'
 import { type FormEvent, useState } from 'react'
 
 import {
+  attributeCategories,
   attributeName,
+  attributesOf,
   documentKinds,
   type DocumentKind,
-  importAttributes,
+  MAX_ATTRIBUTES_PER_IMPORT,
   uploadMediaType,
 } from '@/lib/vault/attributes.ts'
 import { formatClaimValue } from '@/lib/format.ts'
 import { rawClaimValue, reviewClaim } from '@/lib/vault/review.ts'
 import { holderStatus } from '@/lib/status.ts'
 
+import { DemoDocuments } from './DemoDocuments.tsx'
+import { FilePicker } from './FilePicker.tsx'
 import { StatusBadge } from './StatusBadge.tsx'
 import { useVault, VaultError } from './VaultProvider.tsx'
 
@@ -42,8 +46,25 @@ export function ImportPanel() {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const fields = new FormData(event.currentTarget)
-    const file = fields.get('file') as File
+    const file = fields.get('file')
     const attributes = fields.getAll('attributes').map(String)
+    // The file control is off screen, so the browser cannot show a validation bubble on it.
+    if (!(file instanceof File) || file.size === 0) {
+      setStep({ name: 'error', message: 'Choose a document first.', signedOut: false })
+      return
+    }
+    if (attributes.length === 0) {
+      setStep({ name: 'error', message: 'Tick at least one attribute to read.', signedOut: false })
+      return
+    }
+    if (attributes.length > MAX_ATTRIBUTES_PER_IMPORT) {
+      setStep({
+        name: 'error',
+        message: `Choose at most ${MAX_ATTRIBUTES_PER_IMPORT} attributes for one document.`,
+        signedOut: false,
+      })
+      return
+    }
     const upload: DocumentUploadRequest = {
       schemaVersion: '1.0.0',
       documentId: generateOpaqueId(),
@@ -240,19 +261,14 @@ export function ImportPanel() {
 
   return (
     <form className="panel form" onSubmit={onSubmit}>
-      <div className="field">
-        <label htmlFor="file">Document</label>
-        <input
-          id="file"
-          name="file"
-          type="file"
-          accept=".pdf,.txt,application/pdf,text/plain"
-          required
-        />
-        <span className="hint">
-          A PDF or a text file, up to 5 MB. Identity documents are refused.
-        </span>
-      </div>
+      <DemoDocuments />
+
+      <FilePicker
+        name="file"
+        accept=".pdf,.txt,application/pdf,text/plain"
+        label="Document"
+        hint="A PDF or a text file, up to 5 MB. Identity documents are refused here: they go through the identity check on this page."
+      />
 
       <div className="field">
         <label htmlFor="kind">Type of document</label>
@@ -265,15 +281,35 @@ export function ImportPanel() {
         </select>
       </div>
 
-      <fieldset className="field">
-        <legend>Attributes to extract</legend>
-        {importAttributes.map((a) => (
-          <label key={a.attribute} className="check">
-            <input type="checkbox" name="attributes" value={a.attribute} defaultChecked />
-            {a.name}
-          </label>
-        ))}
-      </fieldset>
+      <div className="field">
+        <strong>Attributes to read</strong>
+        <span className="hint">
+          Only the ones you tick are read, and at most {MAX_ATTRIBUTES_PER_IMPORT} per document.
+          Anything else in the file is ignored.
+        </span>
+        <div className="groups">
+          {attributeCategories.map((group) => (
+            <fieldset key={group.category} className="field group">
+              <legend>{group.name}</legend>
+              <div className="checks-grid">
+                {attributesOf(group.category).map((a) => (
+                  <label key={a.attribute} className="check">
+                    <input
+                      type="checkbox"
+                      name="attributes"
+                      value={a.attribute}
+                      defaultChecked={
+                        group.category === 'identity' || group.category === 'education'
+                      }
+                    />
+                    {a.name}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+        </div>
+      </div>
 
       <label className="check consent">
         <input type="checkbox" name="consent" required />

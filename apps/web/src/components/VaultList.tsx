@@ -81,7 +81,10 @@ export function VaultList() {
     return (
       <div className="empty">
         <h2>Your vault is empty</h2>
-        <p>Import a document to add your first attributes.</p>
+        <p>
+          Import a document to add your first attributes, or add an attestation file an organisation
+          sent you with the picker below. Anything you add appears here straight away.
+        </p>
         <Link href="/import" className="button">
           Import a document
         </Link>

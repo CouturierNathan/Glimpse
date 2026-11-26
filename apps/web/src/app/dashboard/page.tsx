@@ -2,18 +2,30 @@ import type { Metadata } from 'next'
 import { AttestationImport } from '@/components/AttestationImport.tsx'
 import { StatusLegend } from '@/components/StatusBadge.tsx'
 import { VaultList } from '@/components/VaultList.tsx'
+import { storageMode } from '@/lib/vault/server.ts'
 
 export const metadata: Metadata = { title: 'Vault · Glimpse' }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const mode = await storageMode()
+
   return (
     <section>
       <header className="page-head">
         <h1>Vault</h1>
+        <p className="who">You, the holder</p>
         <p className="lede">
           Your attributes, each marked with where it comes from. Only you can open them.
         </p>
       </header>
+
+      {mode === 'memory' && (
+        <p className="notice">
+          This server keeps the encrypted items in its own memory, not on a disk. Everything below
+          works, and nothing is less private — the ciphertext simply does not outlive the server.
+          Restart it and the items are gone.
+        </p>
+      )}
 
       <VaultList />
       <AttestationImport />

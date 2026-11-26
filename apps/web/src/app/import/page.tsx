@@ -10,6 +10,7 @@ export default function ImportPage() {
     <section>
       <header className="page-head">
         <h1>Import</h1>
+        <p className="who">You, the holder</p>
         <p className="lede">
           Check your France Identité proof and bind it to your wallet, then add a document and
           choose what to read from it. The attributes stay marked as imported until a verified

@@ -1,11 +1,12 @@
 'use client'
 
-import { type ChangeEvent, useState } from 'react'
+import { useState } from 'react'
 import type { Address } from 'viem'
 
 import { appChain, attestationRegistry } from '@/lib/chains.ts'
 import { readAttestationFile } from '@/lib/issuer.ts'
 
+import { FilePicker } from './FilePicker.tsx'
 import { useSession } from './SessionProvider.tsx'
 import { useVault } from './VaultProvider.tsx'
 
@@ -19,10 +20,8 @@ export function AttestationImport() {
     name: 'idle',
   })
 
-  async function onFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0]
-    event.currentTarget.value = ''
-    if (!file || !address) return
+  async function onFile(file: File) {
+    if (!address) return
     setState({ name: 'busy' })
     try {
       const record = readAttestationFile(await file.text(), {
@@ -44,22 +43,22 @@ export function AttestationImport() {
   }
 
   return (
-    <div className="field">
-      <label htmlFor="attestation">Add an attestation from an organisation</label>
-      <input
-        id="attestation"
-        type="file"
+    <div className="form">
+      <FilePicker
+        name="attestation"
         accept="application/json,.json"
+        label="Add an attestation from an organisation"
+        buttonLabel="Choose an attestation file"
         disabled={state.name === 'busy'}
-        onChange={(event) => void onFile(event)}
+        hint={
+          state.name === 'busy'
+            ? 'Encrypting in this browser…'
+            : state.name === 'done'
+              ? 'Added to your vault. It appears in the list above.'
+              : 'The .json file an organisation sent you. It is encrypted here before it is stored.'
+        }
+        onPick={(file) => void onFile(file)}
       />
-      <span className="hint" aria-live="polite">
-        {state.name === 'busy'
-          ? 'Encrypting in this browser…'
-          : state.name === 'done'
-            ? 'Added to your vault.'
-            : 'The file an organisation sent you. It is encrypted here before it is stored.'}
-      </span>
       {state.name === 'error' && (
         <p role="alert" className="error">
           {state.message}

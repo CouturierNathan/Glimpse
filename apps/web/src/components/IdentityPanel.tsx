@@ -7,6 +7,7 @@ import { signMessage } from 'wagmi/actions'
 import { BINDING_WARNING } from '@/lib/identity/warning.ts'
 import { wagmiConfig } from '@/lib/wagmi.ts'
 
+import { FilePicker } from './FilePicker.tsx'
 import { connectedAddress, describeWalletError } from './SessionProvider.tsx'
 import { useVault } from './VaultProvider.tsx'
 
@@ -72,8 +73,13 @@ export function IdentityPanel() {
 
   async function onCheck(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const chosen = new FormData(event.currentTarget).get('file')
+    if (!(chosen instanceof File) || chosen.size === 0) {
+      setError('Choose a proof first.')
+      return
+    }
     const form = new FormData()
-    form.set('file', new FormData(event.currentTarget).get('file') as File)
+    form.set('file', chosen)
     setError(null)
     setStep({ name: 'checking' })
     try {
@@ -111,20 +117,32 @@ export function IdentityPanel() {
   if (step.name === 'idle' || step.name === 'checking') {
     return (
       <form className="panel form" onSubmit={onCheck}>
-        <div className="field">
-          <label htmlFor="identity-file">France Identité proof</label>
-          <input
-            id="identity-file"
-            name="file"
-            type="file"
-            accept=".pdf,application/pdf"
-            required
-          />
-          <span className="hint">
-            The signed PDF from the France Identité app. Glimpse checks its signature on the server
-            and does not store it or send it to the extractor.
-          </span>
+        <div className="samples">
+          <h3>Two proofs to try</h3>
+          <ul>
+            <li>
+              <a href="/demo/FAKE-identity-proof.pdf" download>
+                Valid proof — passes
+              </a>
+            </li>
+            <li>
+              <a href="/demo/FAKE-identity-proof-wrong-signer.pdf" download>
+                Forged proof — fails the chain
+              </a>
+            </li>
+          </ul>
+          <p className="hint">
+            Both are test files signed by a FAKE test authority, not real documents. The second one
+            is signed by a look-alike signer no trusted authority certifies: the report shows it.
+          </p>
         </div>
+        <FilePicker
+          name="file"
+          accept=".pdf,application/pdf"
+          label="France Identité proof"
+          buttonLabel="Choose a proof"
+          hint="The signed PDF from the France Identité app. Glimpse checks its signature on the server and does not store it or send it to the extractor."
+        />
         <button type="submit" className="button" disabled={step.name === 'checking'}>
           {step.name === 'checking' ? 'Checking the signature…' : 'Check the signature'}
         </button>
