@@ -14,6 +14,13 @@ What this prototype does not do, on purpose or for lack of time.
   signature); the extractor's output is checked against the document but can still miss or
   misread a field.
 
+- **Name matching reads the proof's text.** The holder's surname and given names come from the
+  signed PDF's text streams (plain or Flate, standard fonts). A proof whose fonts hide the text
+  gives no name and fails closed: it cannot be bound, so nothing can be imported. The server keeps
+  keyed fingerprints of the name, in memory, never the name itself.
+- **Identity is held in memory.** A restart forgets every verified identity, like the other
+  server state: the holder checks their proof again.
+
 ## Keys and storage
 
 - **Holder keys live in browser memory only.** Reloading the page drops them, and with them access

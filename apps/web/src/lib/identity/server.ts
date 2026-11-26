@@ -1,19 +1,73 @@
+import { randomBytes } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 
 import { type Address, createPublicClient, type Hex, http, verifyMessage } from 'viem'
 
 import { appChain } from '@/lib/chains.ts'
 
 import { IdentityReportStore } from './binding.ts'
+import {
+  fingerprintName,
+  type HolderName,
+  namesMatch,
+  pdfTextLines,
+  readHolderName,
+} from './holder-name.ts'
 import { pemCertificates, validatePades } from './pades.ts'
 
 // Kept on globalThis so every route handler, and dev hot reloads, share the same state.
 const shared = globalThis as {
   glimpseIdentityReports?: IdentityReportStore
   glimpseTrustAnchors?: Promise<Uint8Array[]>
+  glimpseNameKey?: Uint8Array
 }
 export const identityReports = (shared.glimpseIdentityReports ??= new IdentityReportStore())
+/** Keys the name fingerprints. Random per process: they mean nothing outside this server. */
+const nameKey = (shared.glimpseNameKey ??= new Uint8Array(randomBytes(32)))
+
+/** Where the FAKE test documents live; see tests/fixtures/documents/README.md. */
+const TEST_DOCUMENTS = 'tests/fixtures/documents'
+/** Every FAKE test certificate carries this organisation name. */
+const TEST_AUTHORITY = new TextEncoder().encode('FAKE Glimpse Test')
+
+/**
+ * Test authorities are never trusted in production unless the deployment opts in explicitly, as a
+ * public demo does. A test document then still proves nothing about a real person.
+ */
+export function testAuthoritiesAllowed(): boolean {
+  return process.env.NODE_ENV !== 'production' || process.env.GLIMPSE_ALLOW_TEST_AUTHORITIES === '1'
+}
+
+function isTestAuthority(certificate: Uint8Array): boolean {
+  outer: for (let i = 0; i <= certificate.length - TEST_AUTHORITY.length; i++) {
+    for (let j = 0; j < TEST_AUTHORITY.length; j++) {
+      if (certificate[i + j] !== TEST_AUTHORITY[j]) continue outer
+    }
+    return true
+  }
+  return false
+}
+
+/**
+ * The PEM bundle, read relative to the app, then to the repository root. The FAKE CA's earlier
+ * locations (`fixtures/identity/`, `public/demo/`) still resolve, so a deployment configured
+ * before the test documents moved keeps working.
+ */
+async function readBundle(path: string): Promise<string> {
+  const candidates = [resolve(path), resolve(process.cwd(), '../..', path)]
+  if (basename(path) === 'FAKE-test-ca.pem') {
+    candidates.push(resolve(process.cwd(), '../..', TEST_DOCUMENTS, 'FAKE-test-ca.pem'))
+  }
+  for (const candidate of candidates) {
+    try {
+      return await readFile(candidate, 'utf8')
+    } catch {
+      // Try the next place.
+    }
+  }
+  throw new Error('PADES_TRUST_ANCHORS names a file that does not exist.')
+}
 
 /**
  * The CAs whose PAdES signatures Glimpse accepts, a PEM bundle named by PADES_TRUST_ANCHORS
@@ -23,12 +77,26 @@ export const identityReports = (shared.glimpseIdentityReports ??= new IdentityRe
 function trustAnchors(): Promise<Uint8Array[]> {
   const path = process.env.PADES_TRUST_ANCHORS
   if (!path) return Promise.resolve([])
-  return (shared.glimpseTrustAnchors ??= readFile(resolve(path), 'utf8')
+  return (shared.glimpseTrustAnchors ??= readBundle(path)
     .then(pemCertificates)
+    .then((anchors) =>
+      testAuthoritiesAllowed() ? anchors : anchors.filter((anchor) => !isTestAuthority(anchor)),
+    )
     .catch((error: unknown) => {
       shared.glimpseTrustAnchors = undefined // let the next request retry
       throw error
     }))
+}
+
+/** The fingerprinted name a proof states, or `undefined` when it cannot be read. */
+export function proofHolderName(pdf: Uint8Array): HolderName | undefined {
+  const name = readHolderName(pdfTextLines(pdf))
+  return name ? fingerprintName(name, nameKey) : undefined
+}
+
+/** Whether a document's full name names the holder whose identity was verified. */
+export function namesVerifiedHolder(verified: HolderName, documentName: string): boolean {
+  return namesMatch(verified, documentName, nameKey)
 }
 
 export async function validateSignedPdf(pdf: Uint8Array) {

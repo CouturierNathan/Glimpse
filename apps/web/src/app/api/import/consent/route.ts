@@ -1,3 +1,4 @@
+import { identityReports } from '@/lib/identity/server.ts'
 import { readUploadRequest } from '@/lib/vault/attributes.ts'
 import { errorResponse, noStore, readLimitedBody, vaultErrorResponse } from '@/lib/vault/http.ts'
 import { consents, requireHolder } from '@/lib/vault/server.ts'
@@ -12,6 +13,7 @@ export async function POST(request: Request) {
   if (failure) return failure
 
   try {
+    identityReports.requireVerified(holder.holderId)
     const upload = readUploadRequest(
       JSON.parse(new TextDecoder().decode(await readLimitedBody(request, 4096))),
     )

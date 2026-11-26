@@ -3,6 +3,8 @@ import { type Hex, sha256, stringToBytes } from 'viem'
 
 import { RequestError } from '../requests.ts'
 
+import type { HolderName } from './holder-name.ts'
+
 import { BINDING_WARNING } from './warning.ts'
 
 /** SHA-256 of the report exactly as Glimpse stored it. */
@@ -40,15 +42,42 @@ export function bindingMessage(
 interface Entry {
   holderId: string
   report: IdentityValidationReport
+  /** Fingerprints of the name the proof states; absent when it could not be read. */
+  name?: HolderName
   binding?: { address: string; signature: Hex }
 }
+
+export const IDENTITY_REQUIRED = 'Verify your identity with France Identité first.'
+export const NAME_UNREADABLE =
+  'The name on this proof could not be read. Use the PDF from the France Identité app.'
 
 /** Validation reports and their wallet bindings, in memory: a server restart forgets them. */
 export class IdentityReportStore {
   readonly #entries = new Map<string, Entry>()
 
-  add(holderId: string, report: IdentityValidationReport): void {
-    this.#entries.set(report.reportId, { holderId, report })
+  add(holderId: string, report: IdentityValidationReport, name?: HolderName): void {
+    this.#entries.set(report.reportId, name ? { holderId, report, name } : { holderId, report })
+  }
+
+  /**
+   * The holder's verified identity: the last proof that passed, states a name and is bound to
+   * their wallet. Without it, nothing can be imported or added to the vault.
+   */
+  verified(holderId: string): (Entry & { name: HolderName }) | null {
+    let found: (Entry & { name: HolderName }) | null = null
+    for (const entry of this.#entries.values()) {
+      if (entry.holderId === holderId && entry.binding && entry.name) {
+        found = entry as Entry & { name: HolderName }
+      }
+    }
+    return found
+  }
+
+  /** Like `verified`, but throws the answer the routes send when there is none. */
+  requireVerified(holderId: string): Entry & { name: HolderName } {
+    const entry = this.verified(holderId)
+    if (!entry) throw new RequestError(403, IDENTITY_REQUIRED, 'IDENTITY_REQUIRED')
+    return entry
   }
 
   /** The holder's own report; another holder's reads as missing. */
@@ -64,6 +93,7 @@ export class IdentityReportStore {
     if (entry.report.indication !== 'TOTAL_PASSED') {
       throw new RequestError(409, 'Only a document whose signature passed can be bound.')
     }
+    if (!entry.name) throw new RequestError(422, NAME_UNREADABLE)
     if (entry.binding) throw new RequestError(409, 'This report is already bound to a wallet.')
     entry.binding = { address, signature }
   }

@@ -4,6 +4,7 @@
   "buildCommand": "next build",
   "installCommand": "npm ci --workspaces --include-workspace-root",
   "env": {
-    "VAULT_DATA_DIR": "/tmp/glimpse-vault"
+    "VAULT_DATA_DIR": "/tmp/glimpse-vault",
+    "GLIMPSE_ALLOW_TEST_AUTHORITIES": "1"
   }
 }

@@ -22,22 +22,25 @@ talks to the chain itself.
 
 Set these on the project, for Production and Preview. Only the first is required.
 
-| Variable                             | Value                                                        |
-| ------------------------------------ | ------------------------------------------------------------ |
-| `SESSION_SECRET`                     | `openssl rand -base64 32`, kept out of the repository        |
-| `PADES_TRUST_ANCHORS`                | `fixtures/identity/FAKE-test-ca.pem` to demo the FAKE proofs |
-| `VAULT_DATA_DIR`                     | `/tmp/glimpse-vault`, already set by `vercel.json`           |
-| `VAULT_STORAGE`                      | `memory` to skip `/tmp` entirely; unset uses the file store  |
-| `NEXT_PUBLIC_ATTESTATION_REGISTRY`   | only to point at another deployment of the contracts         |
-| `NEXT_PUBLIC_ISSUER_REGISTRY`        | idem                                                         |
-| `NEXT_PUBLIC_REGISTRIES_DEPLOYED_AT` | idem                                                         |
-| `NEXT_PUBLIC_INDEX_RPC`              | idem                                                         |
+| Variable                             | Value                                                       |
+| ------------------------------------ | ----------------------------------------------------------- |
+| `SESSION_SECRET`                     | `openssl rand -base64 32`, kept out of the repository       |
+| `PADES_TRUST_ANCHORS`                | `../../tests/fixtures/documents/FAKE-test-ca.pem` (demo)    |
+| `GLIMPSE_ALLOW_TEST_AUTHORITIES`     | `1`, already set by `vercel.json`, for the public demo only |
+| `VAULT_DATA_DIR`                     | `/tmp/glimpse-vault`, already set by `vercel.json`          |
+| `VAULT_STORAGE`                      | `memory` to skip `/tmp` entirely; unset uses the file store |
+| `NEXT_PUBLIC_ATTESTATION_REGISTRY`   | only to point at another deployment of the contracts        |
+| `NEXT_PUBLIC_ISSUER_REGISTRY`        | idem                                                        |
+| `NEXT_PUBLIC_REGISTRIES_DEPLOYED_AT` | idem                                                        |
+| `NEXT_PUBLIC_INDEX_RPC`              | idem                                                        |
 
 `OLLAMA_MODEL` stays unset: a hosted function reaches no local model, so extraction uses the
 offline synthetic extractor, which only accepts the synthetic demo documents.
 
-`PADES_TRUST_ANCHORS` can also name `public/demo/FAKE-test-ca.pem`, which is the same file and is
-deployed with the app.
+The FAKE CA is traced into the functions (`outputFileTracingIncludes` in `next.config.ts`). A value
+set before the test documents moved (`fixtures/identity/…` or `public/demo/…`) still resolves to
+it. A production build ignores any FAKE test CA unless `GLIMPSE_ALLOW_TEST_AUTHORITIES=1`: drop it
+from `vercel.json` for a deployment that must accept real France Identité proofs only.
 
 A Vercel function has no poppler, so the import screen reads the text demo documents there and
 refuses the PDFs. The identity check is unaffected: it reads the PDF's signature, not its text, in

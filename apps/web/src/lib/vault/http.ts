@@ -25,7 +25,14 @@ const messageByCode: Record<StorageErrorCode, string> = {
  * `code` lets the browser tell a signed-out user (sign in again) from a signed-in one whose
  * vault key the server does not know yet (register it and retry).
  */
-export type ErrorCode = 'SIGNED_OUT' | 'VAULT_LOCKED'
+export type ErrorCode = 'SIGNED_OUT' | 'VAULT_LOCKED' | 'IDENTITY_REQUIRED' | 'NAME_MISMATCH'
+
+const errorCodes: readonly string[] = [
+  'SIGNED_OUT',
+  'VAULT_LOCKED',
+  'IDENTITY_REQUIRED',
+  'NAME_MISMATCH',
+] satisfies ErrorCode[]
 
 export function errorResponse(status: number, error: string, code?: ErrorCode): Response {
   return Response.json(code ? { error, code } : { error }, { status, headers: noStore })
@@ -53,12 +60,20 @@ export function vaultErrorResponse(error: unknown): Response {
     return errorResponse(statusByCode[error.code], messageByCode[error.code])
   }
   if (error instanceof Error && error.name === 'ExtractionError') {
-    return errorResponse(422, 'No requested attribute could be read from this document.')
+    return errorResponse(
+      422,
+      'Some of the information you ticked is not in this document. Untick it and try again.',
+    )
   }
   if (error instanceof BodyTooLargeError) return errorResponse(413, messageByCode.TOO_LARGE)
   // Our own request-flow errors carry a status and a message written for the user.
   if (error instanceof Error && error.name === 'RequestError' && 'status' in error) {
-    return errorResponse(Number(error.status), error.message)
+    const code = (error as { code?: unknown }).code
+    return errorResponse(
+      Number(error.status),
+      error.message,
+      typeof code === 'string' && errorCodes.includes(code) ? (code as ErrorCode) : undefined,
+    )
   }
   return errorResponse(500, 'Something went wrong on the server.')
 }
