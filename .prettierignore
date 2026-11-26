@@ -6,3 +6,5 @@ contracts/types/
 .next/
 next-env.d.ts
 contracts/ignition/deployments/
+# Encrypted items written by a local dev server.
+**/.vault-data/
