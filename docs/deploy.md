@@ -60,8 +60,8 @@ So, on a Vercel deployment:
 
 - Run one journey end to end in one sitting. A pause long enough for the instance to be recycled
   loses the requests and the items created before it.
-- The holder's keys never left the browser anyway, and reloading the page drops them: that part
-  behaves the same hosted or local.
+- The holder's and requester's keys never leave the browser (IndexedDB): that part behaves the
+  same hosted or local, but they open nothing once the server has forgotten the holder.
 - Nothing on chain is affected. Issuing, revoking and verifying read and write Base Sepolia
   directly, so an anchored attestation and its verdict survive everything above.
 

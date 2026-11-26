@@ -45,7 +45,7 @@ async function signedRequest(
 }
 
 const context = {
-  sessionAddress: requester.address,
+  requester: requester.address,
   chainId: CHAIN,
   recipientId,
   recipientKeyIds: [recipientKeyId],
@@ -61,7 +61,7 @@ async function rejects(input: unknown, status: number, ctx = context) {
   })
 }
 
-test('validateRequest accepts a request signed by the signed-in requester', async () => {
+test('validateRequest accepts a request signed by the requester key', async () => {
   const request = await signedRequest()
   assert.deepEqual(await validateRequest(request, context), request)
 })
@@ -75,21 +75,21 @@ test('validateRequest refuses a request edited after signing', async () => {
   await rejects({ ...request, purpose: 'Something else entirely' }, 400)
 })
 
-test('validateRequest refuses a requester other than the session', async () => {
-  await rejects(await signedRequest(), 403, { ...context, sessionAddress: stranger.address })
+test('validateRequest refuses a request from another requester than the rest', async () => {
+  await rejects(await signedRequest(), 400, { ...context, requester: stranger.address })
 })
 
 test('validateRequest refuses unknown attributes, empty purposes and long lifetimes', async () => {
   await rejects(await signedRequest({ attribute: 'home_address' }), 400)
   await rejects(await signedRequest({ purpose: '   ' }), 400)
   await rejects(
-    await signedRequest({ expiresAt: new Date(NOW + 2 * 60 * 60_000).toISOString() }),
+    await signedRequest({ expiresAt: new Date(NOW + 8 * 24 * 60 * 60_000).toISOString() }),
     400,
   )
   await rejects(await signedRequest({ expiresAt: new Date(NOW - 1000).toISOString() }), 400)
 })
 
-test('validateRequest refuses a key the requester did not register', async () => {
+test('validateRequest refuses an encryption key other than the request’s', async () => {
   await rejects(await signedRequest({ recipientKeyId: 'd'.repeat(32) }), 400)
 })
 

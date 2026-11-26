@@ -48,9 +48,11 @@ Nothing turns A or B into C: only an issuer's EIP-712 signature, anchored on cha
 4. **Issue (C).** An organisation registers in `IssuerRegistry`, signs an attestation (EIP-712,
    domain bound to the chain id and the `AttestationRegistry` address) and calls `anchor` with the
    salted commitment. The holder receives the record file (value and salt) and stores it encrypted.
-5. **Share.** The requester signs a `VerificationRequest` (one attribute, one purpose, at most 1 h)
-   and sends the holder the link. The holder allows with one item or refuses. On allow, the
-   holder's browser wraps the item key for the requester's public key and publishes the envelope.
+5. **Share.** The requester, with no wallet or account, signs one `VerificationRequest` per piece
+   of information (one purpose, at most 7 days) with a throwaway key made in its browser, and
+   sends the holder the link. The holder chooses, piece by piece, an item to share or refuses. On
+   allow, the holder's browser wraps the item key for the requester's public key and publishes
+   the envelope.
 6. **Verify.** The requester downloads the ciphertext and envelope, decrypts in its browser and runs
    `verify()`, which reads `getAnchor` from Base Sepolia itself and never trusts a Glimpse answer.
    The holder can withdraw consent; the issuer can revoke on chain.

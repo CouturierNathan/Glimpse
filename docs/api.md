@@ -49,15 +49,28 @@ withdrawn when the run ends, success or failure.
 
 ## Verification requests
 
-| Method and path                           | Auth   | Body                                                       | Who                                       | Success                                                                                         |
-| ----------------------------------------- | ------ | ---------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `POST /api/requests`                      | holder | a signed `VerificationRequest`                             | requester                                 | `201 { requestId }`                                                                             |
-| `GET /api/requests/{requestId}`           | holder |                                                            | anyone signed in with the link            | the request and `role` (`requester`, `holder`, `visitor`); a visitor sees `answered`, never how |
-| `POST /api/requests/{requestId}/decision` | holder | `{ outcome: "deny" }` or `{ outcome: "allow", reference }` | the holder                                | `204` on deny; on allow `{ grant, recipient }` for the browser to wrap the item key             |
-| `POST /api/requests/{requestId}/envelope` | holder | `{ envelope, expected }`                                   | the holder who allowed                    | `204`, the request becomes `shared`. `409` nothing to share                                     |
-| `GET /api/requests/{requestId}/share`     | holder |                                                            | the requester only (`403` otherwise)      | the encrypted item, its envelope, the holder's pins and the request. `409` not shared yet       |
-| `DELETE /api/requests/{requestId}/share`  | holder |                                                            | the holder who answered (`403` otherwise) | `204`: consent withdrawn, the requester can no longer download                                  |
+A request asks for one or more pieces of information. **Creating and reading one needs no account
+and no wallet.** The requester's browser makes a throwaway signing key and an RSA-OAEP key pair,
+kept in its IndexedDB: it signs one `VerificationRequest` per piece with the signing key (so the
+verifier's own signature and replay checks hold) and receives the answers on the encryption key.
+The link it shares is `/consent/{requestId}`, where `requestId` is the request (bundle) id; each
+piece has its own id for the holder's answer.
 
-`POST /api/requests` refuses a request not signed by the session's wallet, on another chain, for
-an unknown attribute, with an empty purpose, living more than 1 h, or addressed to a key the
-requester did not register. An unknown or malformed `requestId` is `404`.
+| Method and path                         | Auth           | Body                                                       | Who                                       | Success                                                                                                                |
+| --------------------------------------- | -------------- | ---------------------------------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/requests`                    | none           | `{ bundleId, requesterName, publicKey, requests[] }`       | anyone                                    | `201 { requestId }`. `requests` are signed `VerificationRequest`s, 1 to 8, same key, purpose and lifetime              |
+| `GET /api/requests/{requestId}`         | none, optional | (requester proof header)                                   | anyone with the link                      | `{ requesterName, purpose, expiresAt, role, status, items[] }`. A visitor sees `pending` / `answered` / `expired` only |
+| `POST /api/requests/{pieceId}/decision` | holder         | `{ outcome: "deny" }` or `{ outcome: "allow", reference }` | the first holder to answer (`409` others) | `204` on deny; on allow `{ grant, recipient }` for the browser to wrap the item key                                    |
+| `POST /api/requests/{pieceId}/envelope` | holder         | `{ envelope, expected }`                                   | the holder who allowed                    | `204`, the piece becomes `shared`. `409` nothing to share                                                              |
+| `GET /api/requests/{pieceId}/share`     | requester      | (requester proof header)                                   | the requester only (`403` otherwise)      | the encrypted item, its envelope, the holder's pins and the request. `409` not shared yet                              |
+| `DELETE /api/requests/{pieceId}/share`  | holder         |                                                            | the holder who answered (`403` otherwise) | `204`: consent withdrawn, the requester can no longer download                                                         |
+
+The requester proof is the header `x-glimpse-requester: <ISO time>.<signature>`, an EIP-191
+signature by the request's signing key over `Glimpse requester access / Request: {requestId} /
+At: {time}`, accepted for five minutes. Nothing else identifies the requester; `requesterName` is
+what they declared and the holder's screen says so.
+
+`POST /api/requests` refuses pieces not all signed by the same key, on another chain, for an
+unknown or repeated attribute, with an empty purpose, or living more than seven days. At most
+2,000 requests are kept at once (`503` beyond); a request is forgotten a day after it expires. An
+unknown or malformed id is `404`.

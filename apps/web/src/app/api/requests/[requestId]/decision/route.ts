@@ -1,21 +1,23 @@
 import { findRequest, readJson } from '@/lib/requests-http.ts'
 import { RequestError } from '@/lib/requests.ts'
 import { noStore, vaultErrorResponse } from '@/lib/vault/http.ts'
-import { holders, requests, requireHolder, shareService, vaultStorage } from '@/lib/vault/server.ts'
+import { bundles, requests, requireHolder, shareService, vaultStorage } from '@/lib/vault/server.ts'
 
 type Context = RouteContext<'/api/requests/[requestId]/decision'>
 
 /**
- * The holder's answer. A refusal ends the request. A consent names one of the holder's items: the
- * server checks it owns that item, creates the grant, and returns what the holder's browser needs
- * to wrap the item key for the requester. The server never sees the item key or its content.
+ * The holder's answer to one piece of a request. A refusal ends that piece. A consent names one of
+ * the holder's items: the server checks it owns that item, creates the grant, and returns what the
+ * holder's browser needs to wrap the item key for the requester. The server never sees the item
+ * key or its content. The first holder to answer a request is the only one who can.
  */
 export async function POST(request: Request, { params }: Context) {
   const { holder, failure } = await requireHolder()
   if (failure) return failure
   const { requestId } = await params
   try {
-    const stored = findRequest(requestId)
+    const { bundle } = findRequest(requestId)
+    bundles.claim(bundle, holder.holderId)
     const body = (await readJson(request)) as { outcome?: unknown; reference?: unknown }
 
     if (body.outcome === 'deny') {
@@ -26,8 +28,7 @@ export async function POST(request: Request, { params }: Context) {
       throw new RequestError(400, 'Choose the item to share, or refuse the request.')
     }
 
-    const publicKey = holders.publicKey(stored.request.recipientId, stored.request.recipientKeyId)
-    if (!publicKey) throw new RequestError(409, 'The requester’s key is no longer registered.')
+    const { publicKey } = bundle
 
     const item = await (await vaultStorage()).get(body.reference)
     if (!item) throw new RequestError(404, 'This item is not in your vault.')
@@ -50,7 +51,7 @@ export async function POST(request: Request, { params }: Context) {
       {
         grant: ticket.grant,
         recipient: {
-          recipientId: stored.request.recipientId,
+          recipientId: bundle.recipientId,
           recipientKeyId: ticket.recipientKeyId,
           publicKey,
         },

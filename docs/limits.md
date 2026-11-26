@@ -23,8 +23,15 @@ What this prototype does not do, on purpose or for lack of time.
 
 ## Keys and storage
 
-- **Holder keys live in browser memory only.** Reloading the page drops them, and with them access
-  to the vault items they encrypted. There is no key backup or recovery.
+- **Keys live in the browser.** The holder's encryption key pair and item list, and each
+  requester's signing and encryption keys, are kept in that browser's IndexedDB; the private keys
+  are non-extractable `CryptoKey`s and never leave it. Another browser, a private window or cleared
+  site data cannot open them. Signing out deletes the holder's. The holder id they are tied to lives
+  in server memory: after a restart the server issues a new one and the old items cannot be opened.
+- **Requests are anonymous.** Anyone can create one; the requester's name is declared, never
+  verified, and the holder's screen says so. Memory is bounded (2,000 open requests).
+
+- **No key backup or recovery.** Keys kept in one browser cannot be moved to another.
 - **Server state is in memory.** Holders' registered public keys, verification requests, decisions,
   extraction consents and identity reports are lost when the server restarts. Only the encrypted
   items and the shares' grants, key envelopes and revocation markers are written to disk
@@ -53,7 +60,7 @@ What this prototype does not do, on purpose or for lack of time.
 
 ## Product
 
-- **One attribute per request**, at most 1 h of validity, and no selective disclosure or
-  zero-knowledge proof: the requester sees the shared value itself.
+- **Up to 8 pieces per request**, at most 7 days of validity, and no selective disclosure or
+  zero-knowledge proof: the requester sees each shared value itself.
 - **No demo video in the repo.** Signing with a wallet needs a person at the browser; the video is
   recorded by the team.

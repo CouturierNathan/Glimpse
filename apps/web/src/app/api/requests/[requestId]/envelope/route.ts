@@ -31,7 +31,7 @@ export async function POST(request: Request, { params }: Context) {
   if (failure) return failure
   const { requestId } = await params
   try {
-    const stored = findRequest(requestId)
+    const { stored } = findRequest(requestId)
     if (stored.decision?.holderId !== holder.holderId || !stored.shareReference) {
       throw new RequestError(409, 'Nothing to share for this request.')
     }

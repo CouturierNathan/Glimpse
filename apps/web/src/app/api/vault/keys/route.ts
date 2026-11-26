@@ -7,25 +7,8 @@ import {
   signedOut,
   vaultErrorResponse,
 } from '@/lib/vault/http.ts'
+import { isEncryptionKey } from '@/lib/vault/keys.ts'
 import { holders } from '@/lib/vault/server.ts'
-
-const BASE64URL = /^[A-Za-z0-9_-]+$/
-
-/** True when the bytes are an RSA-OAEP SHA-256 public key of at least 2048 bits. */
-async function isEncryptionKey(spki: Uint8Array<ArrayBuffer>): Promise<boolean> {
-  try {
-    const key = await crypto.subtle.importKey(
-      'spki',
-      spki,
-      { name: 'RSA-OAEP', hash: 'SHA-256' },
-      true,
-      ['wrapKey'],
-    )
-    return (key.algorithm as RsaHashedKeyAlgorithm).modulusLength >= 2048
-  } catch {
-    return false
-  }
-}
 
 /** Registers a public encryption key the browser generated for the signed-in holder. */
 export async function POST(request: Request) {
@@ -41,8 +24,7 @@ export async function POST(request: Request) {
     if (
       typeof recipientKeyId !== 'string' ||
       typeof publicKey !== 'string' ||
-      !BASE64URL.test(publicKey) ||
-      !(await isEncryptionKey(Uint8Array.from(Buffer.from(publicKey, 'base64url'))))
+      !(await isEncryptionKey(publicKey))
     ) {
       return errorResponse(400, 'The public key is not a valid encryption key.')
     }

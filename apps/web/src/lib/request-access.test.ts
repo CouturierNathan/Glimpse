@@ -3,71 +3,134 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 
-import { fixtures, type VerificationRequest } from '@glimpse/shared'
+import { generateOpaqueId } from '@glimpse/vault'
+import { requestDomain, requestMessage, requestTypes } from '@glimpse/verifier'
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 
-import type { Session } from './auth/session.ts'
-import { isRequester, requestView, type StoredRequest } from './requests.ts'
+import { requesterProofMessage, verifyRequesterProof } from './request-proof.ts'
+import { BundleStore, bundleView, RequestError, RequestStore, validateBundle } from './requests.ts'
 
-const request = fixtures.valid.VerificationRequest as VerificationRequest
+const CHAIN = 84532
+const NOW = Date.parse('2026-11-07T12:00:00.000Z')
+const signer = privateKeyToAccount(generatePrivateKey())
 const holderId = 'd'.repeat(32)
 
-const session = (address: string): Session => ({
-  schemaVersion: '1.0.0',
-  address: address as Session['address'],
-  chainId: request.proof.chainId,
-  issuedAt: '2026-11-07T12:00:00.000Z',
-  expiresAt: '2026-11-08T12:00:00.000Z',
-})
-const requester = session(request.requester)
-const stranger = session('0x70997970C51812dc3A010C7d01b50e0d17dc79C8')
-
-function stored(state: StoredRequest['state']): StoredRequest {
-  return {
-    request,
-    state,
-    decision:
-      state === 'pending' ? undefined : ({ holderId } as unknown as StoredRequest['decision']),
+async function bundleInput(attributes = ['full_name', 'exam_score'], key = signer) {
+  const base = {
+    schemaVersion: '1.0.0' as const,
+    requester: key.address,
+    purpose: 'Admission',
+    recipientId: 'a'.repeat(32),
+    recipientKeyId: 'b'.repeat(32),
+    createdAt: new Date(NOW).toISOString(),
+    expiresAt: new Date(NOW + 24 * 3600_000).toISOString(),
   }
+  const requests = []
+  for (const attribute of attributes) {
+    const body = { ...base, requestId: generateOpaqueId(), attribute }
+    const signature = await key.signTypedData({
+      domain: requestDomain(CHAIN),
+      types: requestTypes,
+      primaryType: 'VerificationRequest',
+      message: requestMessage(body),
+    })
+    requests.push({ ...body, proof: { type: 'EIP712' as const, chainId: CHAIN, signature } })
+  }
+  return { bundleId: generateOpaqueId(), requesterName: 'Epitech', publicKey: 'k', requests }
 }
 
-test('only the wallet that signed a request is its requester, whatever the address case', () => {
-  const lower = session(request.requester.toLowerCase())
+const context = {
+  chainId: CHAIN,
+  attributes: new Set(['full_name', 'exam_score', 'school']),
+  isEncryptionKey: () => Promise.resolve(true),
+  now: NOW,
+}
 
-  assert.equal(isRequester(stored('shared'), requester), true)
-  assert.equal(isRequester(stored('shared'), lower), true)
-  assert.equal(isRequester(stored('shared'), stranger), false)
+async function stored(attributes?: string[]) {
+  const { bundle, requests } = await validateBundle(await bundleInput(attributes), context)
+  const store = new RequestStore()
+  const bundles = new BundleStore()
+  bundles.add(bundle, store, requests, NOW)
+  return { bundle, store, bundles, requests }
+}
+
+test('a request for several pieces is stored as one link, each piece signed by the same key', async () => {
+  const { bundle, requests } = await stored(['full_name', 'exam_score', 'school'])
+  assert.equal(bundle.requestIds.length, 3)
+  assert.ok(requests.every((r) => r.requester === signer.address))
 })
 
-test('a visitor with the link never learns how an answered request ended', () => {
-  for (const state of ['refused', 'allowed', 'shared', 'withdrawn'] as const) {
-    const view = requestView(stored(state), stranger, 'e'.repeat(32))
-
-    assert.equal(view.role, 'visitor')
-    assert.equal(view.state, 'answered')
+test('a bundle mixing requesters, purposes or repeating a piece is refused', async () => {
+  const input = await bundleInput()
+  const other = await bundleInput(['school'], privateKeyToAccount(generatePrivateKey()))
+  const cases = [
+    { ...input, requests: [...input.requests, ...other.requests] },
+    { ...input, requests: [input.requests[0], input.requests[0]] },
+    { ...input, requesterName: '' },
+    { ...input, requests: [] },
+  ]
+  for (const body of cases) {
+    await assert.rejects(validateBundle(body, context), RequestError)
   }
 })
 
-test('the requester and the answering holder see where the request stands', () => {
+test('a visitor with the link sees what is asked, never how it was answered', async () => {
+  const { bundle, store } = await stored()
+  const open = bundleView(bundle, store, 'visitor', NOW)
+  assert.equal(open.status, 'open')
   assert.deepEqual(
-    [requestView(stored('shared'), requester, 'e'.repeat(32))].map((v) => [v.role, v.state]),
-    [['requester', 'shared']],
+    open.items.map((i) => i.state),
+    ['pending', 'pending'],
+  )
+
+  const [first = '', second = ''] = bundle.requestIds
+  bundle.holderId = holderId
+  store.decide(first, holderId, { outcome: 'deny' }, NOW)
+  store.decide(second, holderId, { outcome: 'allow', itemId: 'e'.repeat(32), itemVersion: 1 }, NOW)
+  const visitor = bundleView(bundle, store, 'visitor', NOW)
+  assert.equal(visitor.status, 'answered')
+  assert.deepEqual(
+    visitor.items.map((i) => i.state),
+    ['answered', 'answered'],
   )
   assert.deepEqual(
-    [requestView(stored('refused'), stranger, holderId)].map((v) => [v.role, v.state]),
-    [['holder', 'refused']],
+    bundleView(bundle, store, 'requester', NOW).items.map((i) => i.state),
+    ['refused', 'allowed'],
   )
+  for (const key of ['holderId', 'publicKey', 'requester', 'recipientKeyId']) {
+    assert.equal(key in visitor, false, key)
+  }
 })
 
-test('a request view carries no decision, grant, share reference or key pins', () => {
-  const view = requestView(
-    { ...stored('shared'), shareReference: 'f'.repeat(32), expected: {} as never },
-    requester,
-    holderId,
-  )
+test('only the first holder to answer can answer a request', async () => {
+  const { bundle, bundles } = await stored()
+  bundles.claim(bundle, holderId)
+  bundles.claim(bundle, holderId)
+  assert.throws(() => bundles.claim(bundle, 'f'.repeat(32)), { status: 409 })
+})
 
-  for (const key of ['decision', 'shareReference', 'expected', 'proof', 'recipientKeyId']) {
-    assert.equal(key in view, false, key)
-  }
+test('the same request cannot be stored twice', async () => {
+  const { bundle, store, bundles, requests } = await stored()
+  assert.throws(() => bundles.add(bundle, store, requests, NOW), { status: 409 })
+})
+
+test('only a fresh signature by the request key proves the requester', async () => {
+  const id = generateOpaqueId()
+  const at = new Date(NOW).toISOString()
+  const signature = await signer.signMessage({ message: requesterProofMessage(id, at) })
+  assert.equal(await verifyRequesterProof(`${at}.${signature}`, id, signer.address, NOW), true)
+  // Another request, another key, a stale time, or nothing at all.
+  assert.equal(
+    await verifyRequesterProof(`${at}.${signature}`, generateOpaqueId(), signer.address, NOW),
+    false,
+  )
+  const stranger = privateKeyToAccount(generatePrivateKey())
+  assert.equal(await verifyRequesterProof(`${at}.${signature}`, id, stranger.address, NOW), false)
+  assert.equal(
+    await verifyRequesterProof(`${at}.${signature}`, id, signer.address, NOW + 10 * 60_000),
+    false,
+  )
+  assert.equal(await verifyRequesterProof(null, id, signer.address, NOW), false)
 })
 
 // A server-side log line is where a claim, a key envelope or a session would leak first.

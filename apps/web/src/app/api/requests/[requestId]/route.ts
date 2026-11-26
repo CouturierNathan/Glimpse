@@ -1,17 +1,23 @@
-import { findRequest, requestView } from '@/lib/requests-http.ts'
+import { findBundle, isRequesterCall } from '@/lib/requests-http.ts'
+import { bundleView, type Role } from '@/lib/requests.ts'
 import { noStore, vaultErrorResponse } from '@/lib/vault/http.ts'
-import { requireHolder } from '@/lib/vault/server.ts'
+import { optionalHolder, requests } from '@/lib/vault/server.ts'
 
-/** The request behind a link, as the signed-in visitor may see it. */
-export async function GET(
-  _request: Request,
-  { params }: RouteContext<'/api/requests/[requestId]'>,
-) {
-  const { holder, session, failure } = await requireHolder()
-  if (failure) return failure
+/**
+ * The request behind a link. Anyone may read what is asked and by whom, without signing in: no
+ * value is ever part of it. The requester (proving its key) and the holder who answered also see
+ * where each piece stands.
+ */
+export async function GET(request: Request, { params }: RouteContext<'/api/requests/[requestId]'>) {
   try {
-    const stored = findRequest((await params).requestId)
-    return Response.json(requestView(stored, session, holder.holderId), { headers: noStore })
+    const bundle = findBundle((await params).requestId)
+    let role: Role = 'visitor'
+    if (await isRequesterCall(request, bundle)) role = 'requester'
+    else {
+      const holder = await optionalHolder()
+      if (holder && bundle.holderId === holder.holderId) role = 'holder'
+    }
+    return Response.json(bundleView(bundle, requests, role), { headers: noStore })
   } catch (error) {
     return vaultErrorResponse(error)
   }
