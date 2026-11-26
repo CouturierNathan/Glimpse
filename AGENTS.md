@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Rules for everyone working on Glimpse, humans and AI agents alike. `CLAUDE.md` is a symlink to this file.
+Rules for everyone working on Glimpse, humans and AI agents alike.
 
 ## Project
 
