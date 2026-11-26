@@ -57,6 +57,7 @@ Working rules (branches, reviews, security): [AGENTS.md](AGENTS.md).
 ## Documentation
 
 - [Install and run](docs/install.md)
+- [Deploy and mirror](docs/deploy.md)
 - [Architecture and testnet deployment](docs/architecture.md)
 - [API](docs/api.md)
 - [Security tests](docs/security-tests.md)

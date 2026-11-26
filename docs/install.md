@@ -16,6 +16,12 @@ openssl rand -base64 32   # paste it as SESSION_SECRET in apps/web/.env.local
 npm run dev -w apps/web   # http://localhost:3000
 ```
 
+On Windows, run the app through WSL: the encrypted store is POSIX object storage and refuses to
+start on a filesystem without `O_NOFOLLOW`, hard links and directory mode bits. Everything else —
+the checks below, the contracts, the browser — runs natively.
+
+To host it instead of running it locally, see [deploy.md](deploy.md).
+
 ## Environment (`apps/web/.env.local`)
 
 | Variable                             | Default                                      | What                                                                                             |
@@ -43,6 +49,18 @@ npm run lint && npm run format:check && npm test
 
 `npm test` runs every workspace: web (typecheck and `node:test`), vault, verifier, shared, and the
 contracts on a local Hardhat chain.
+
+Two groups of tests report themselves as skipped rather than failing when the machine cannot run
+them. The vault's file storage is POSIX object storage — it opens with `O_NOFOLLOW`, publishes with
+a hard link and keeps its directories private by mode — so its tests only run on Linux and macOS;
+the memory adapter covers the same behaviour everywhere. The tests that read a real PDF or run OCR
+need poppler (`pdfinfo`, `pdftotext`, `pdftoppm`) and `tesseract`; CI installs them, and so can
+you:
+
+```sh
+sudo apt-get install poppler-utils tesseract-ocr   # Debian, Ubuntu
+brew install poppler tesseract                     # macOS
+```
 
 ## Contracts
 

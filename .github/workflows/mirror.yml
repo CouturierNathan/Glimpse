@@ -1,0 +1,46 @@
+name: Mirror
+
+# Pushes this repository to the school's repository, so the hand-in there always matches main.
+# Does nothing until the repository variable EPITECH_REPOSITORY and the secret
+# EPITECH_DEPLOY_KEY exist: see docs/deploy.md#mirror-to-the-epitech-repository.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    if: vars.EPITECH_REPOSITORY != ''
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Push every branch and tag to the school's repository
+        env:
+          DEPLOY_KEY: ${{ secrets.EPITECH_DEPLOY_KEY }}
+          REPOSITORY: ${{ vars.EPITECH_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_KEY:-}" ]; then
+            echo "EPITECH_DEPLOY_KEY is not set: see docs/deploy.md" >&2
+            exit 1
+          fi
+          host=${REPOSITORY#ssh://}
+          host=${host#*@}
+          host=${host%%:*}
+          host=${host%%/*}
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/mirror_key
+          chmod 600 ~/.ssh/mirror_key
+          ssh-keyscan -H "$host" >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/mirror_key -o IdentitiesOnly=yes"
+          git remote add epitech "$REPOSITORY"
+          git push --mirror epitech

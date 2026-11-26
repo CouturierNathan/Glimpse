@@ -23,7 +23,12 @@ What this prototype does not do, on purpose or for lack of time.
   items and the shares' grants, key envelopes and revocation markers are written to disk
   (`VAULT_DATA_DIR`).
 - **Single server.** The stores are per process: running several instances behind a load balancer
-  would split them.
+  would split them. The hosted deployment is exactly that case — each function instance has its own
+  memory and its own `/tmp` — so a journey has to be run in one sitting. See
+  [deploy.md](deploy.md#what-a-hosted-deployment-does-not-keep).
+- **POSIX only.** The encrypted store opens with `O_NOFOLLOW`, publishes with a hard link and keeps
+  its directories private by mode. It refuses to start where those are missing rather than dropping
+  them, so the app runs on Linux and macOS, and on Windows through WSL.
 
 ## Chain
 

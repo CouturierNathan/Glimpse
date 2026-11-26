@@ -9,6 +9,7 @@ next-env.d.ts
 .env.*
 !.env.example
 *.log
+.vercel/
 .DS_Store
 
 contracts/artifacts/
