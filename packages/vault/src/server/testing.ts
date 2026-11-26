@@ -17,20 +17,20 @@ export function posixStorageSkip(): string | false {
   return false
 }
 
-const OCR_TOOLS = ['pdftoppm', 'tesseract']
-let missingOcrTools: string[] | undefined
+const PDF_TOOLS = ['pdfinfo', 'pdftotext', 'pdftoppm', 'tesseract']
+let missingPdfTools: string[] | undefined
 
 /**
- * Why a test that runs OCR on a scanned PDF cannot run here, or false when it can. Reading a PDF's
- * text needs nothing installed (pdf.js runs in Node); only a scan needs poppler's rasteriser and
- * tesseract, which CI installs and a workstation often lacks.
+ * Why a test that reads a real PDF or runs OCR cannot run here, or false when it can. CI installs
+ * poppler and tesseract; a workstation often has neither, and the extractor then rejects every
+ * document for want of a binary rather than for anything the test is about.
  */
-export function ocrToolsSkip(): string | false {
-  missingOcrTools ??= OCR_TOOLS.filter(
+export function pdfToolsSkip(): string | false {
+  missingPdfTools ??= PDF_TOOLS.filter(
     (tool) => spawnSync(tool, ['-v'], { stdio: 'ignore', shell: false }).error !== undefined,
   )
-  if (missingOcrTools.length === 0) return false
-  return `needs ${missingOcrTools.join(', ')}: install poppler-utils and tesseract-ocr`
+  if (missingPdfTools.length === 0) return false
+  return `needs ${missingPdfTools.join(', ')}: install poppler-utils and tesseract-ocr`
 }
 
 /** The in-process adapter, under the name the tests already use. */

@@ -24,8 +24,7 @@
     }
   },
   "dependencies": {
-    "@glimpse/shared": "0.1.0",
-    "unpdf": "^2.2.3"
+    "@glimpse/shared": "0.1.0"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.browser.json",

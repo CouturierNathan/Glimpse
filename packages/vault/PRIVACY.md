@@ -80,7 +80,8 @@ wipe. The policy makes no claim that private demo keys survive a browser reload.
 
 ## Reproducible demo and tests
 
-Install Node 24; for scanned PDFs, Poppler's `pdftoppm` and Tesseract with English data. From repository root:
+Install Node 24, Poppler (`pdfinfo`, `pdftotext`, `pdftoppm`) and Tesseract with English
+data. From repository root:
 
 ```sh
 npm ci

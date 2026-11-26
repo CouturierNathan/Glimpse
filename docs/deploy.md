@@ -43,9 +43,10 @@ set before the test documents moved (`fixtures/identity/…` or `public/demo/…
 it. A production build ignores any FAKE test CA unless `GLIMPSE_ALLOW_TEST_AUTHORITIES=1`: drop it
 from `vercel.json` for a deployment that must accept real France Identité proofs only.
 
-PDFs are read in the function itself with pdf.js (through `unpdf`), so text documents, text PDFs
-and signed PDFs (class B) all import on Vercel, like the identity check. Only a scanned PDF, which
-needs OCR (poppler's `pdftoppm` and `tesseract`), is refused there.
+A Vercel function has no poppler, so the import screen reads the text demo documents there and
+refuses the PDFs. The identity check is unaffected: it reads the PDF's signature, not its text, in
+pure JavaScript. Class B, which needs a signed PDF's text, is demonstrated on a machine with
+poppler installed.
 
 Pick one region (Settings → Functions), ideally Paris (`cdg1`). The reason is below.
 

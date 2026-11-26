@@ -19,8 +19,8 @@ npm run dev -w apps/web   # http://localhost:3000
 The app runs natively on Windows. The encrypted store is POSIX object storage and refuses to start
 where `O_NOFOLLOW`, hard links and directory mode bits are missing, so there the app keeps the
 ciphertext in the server's memory instead and the vault screen says so. Use WSL, or set
-`VAULT_STORAGE=file` on a POSIX machine, when the items have to survive a restart. Everything
-runs on Node alone, PDFs included (pdf.js); only OCR of a scanned PDF uses poppler and tesseract.
+`VAULT_STORAGE=file` on a POSIX machine, when the items have to survive a restart. The only part
+that needs more than Node is reading a PDF's text, which uses poppler.
 
 To host it instead of running it locally, see [deploy.md](deploy.md).
 
@@ -67,8 +67,9 @@ contracts on a local Hardhat chain.
 Two groups of tests report themselves as skipped rather than failing when the machine cannot run
 them. The vault's file storage is POSIX object storage — it opens with `O_NOFOLLOW`, publishes with
 a hard link and keeps its directories private by mode — so its tests only run on Linux and macOS;
-the memory adapter covers the same behaviour everywhere. The OCR test needs poppler's
-`pdftoppm` and `tesseract` (reading a PDF's text does not); CI installs them, and so can you:
+the memory adapter covers the same behaviour everywhere. The tests that read a real PDF or run OCR
+need poppler (`pdfinfo`, `pdftotext`, `pdftoppm`) and `tesseract`; CI installs them, and so can
+you:
 
 ```sh
 sudo apt-get install poppler-utils tesseract-ocr   # Debian, Ubuntu

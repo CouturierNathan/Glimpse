@@ -42,10 +42,9 @@ Known instruction-injection patterns are rejected before the provider call, docu
 text is always data under a fixed system policy, and every output is evidence checked.
 Pattern detection is defense in depth, not a claim to detect every possible injection.
 
-`withPdfPages(pdfBytes, callback)` reads real PDF text in process with pdf.js (through
-`unpdf`, built for serverless hosts: no binary, no temporary file), and invokes Poppler
-rasterization plus Tesseract only for empty scanned pages. Install `poppler-utils` and
-`tesseract-ocr` (English OCR data) where scanned documents must be read. Files are private random
+`withPdfPages(pdfBytes, callback)` handles real PDF text via Poppler and invokes
+Poppler rasterization plus Tesseract for empty scanned pages. Install `poppler-utils`
+and `tesseract-ocr` (English OCR data) on the local server. Files are private random
 job directories, filenames are internal, subprocesses do not use a shell, timeouts
 and output/page/pixel/input bounds apply, and all source/OCR files are purged in a
 finally block. Limits: 5 MiB PDF, 12 pages, 40,000 characters/page, eight attributes,

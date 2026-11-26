@@ -12,7 +12,7 @@ import {
   withPdfPages,
 } from '@glimpse/vault/server'
 import type { AttributeSpec, ExtractionDocument, ExtractionModel } from '@glimpse/vault/server'
-import { ocrToolsSkip } from '@glimpse/vault/server/testing'
+import { pdfToolsSkip } from '@glimpse/vault/server/testing'
 const text = await readFile(new URL('../fixtures/education-synthetic.txt', import.meta.url), 'utf8')
 const doc: ExtractionDocument = {
   documentId: 'a'.repeat(32),
@@ -97,43 +97,38 @@ test('document prompt injection rejected before any model call; uncertain/ambigu
   await assert.rejects(extractClaims({ ...doc, kind: 'identity' }, specs, model))
   await assert.rejects(extractClaims(doc, specs, model))
 })
-const readClaims = async (name: string) =>
-  withPdfPages(await readFile(new URL(`../fixtures/${name}`, import.meta.url)), (pages) =>
-    extractClaims({ ...doc, pages }, specs, syntheticDemoModel()),
-  )
-test('a real PDF is read in process, with nothing installed, into the requested claims', async () => {
-  const claims = await readClaims('education-synthetic.pdf')
-  assert.equal(claims.length, 2)
-  assert.equal(claims[1]?.value.value, 42)
+const pdfTools = { skip: pdfToolsSkip() }
+test('real PDF text parser and real OCR produce the requested claims', pdfTools, async () => {
+  for (const name of ['education-synthetic.pdf', 'education-scanned-synthetic.pdf']) {
+    const pdf = await readFile(new URL(`../fixtures/${name}`, import.meta.url))
+    const claims = await withPdfPages(pdf, (pages) =>
+      extractClaims({ ...doc, pages }, specs, syntheticDemoModel()),
+    )
+    assert.equal(claims.length, 2)
+    assert.equal(claims[1]?.value.value, 42)
+  }
 })
-test('a scanned PDF goes through real OCR', { skip: ocrToolsSkip() }, async () => {
-  const claims = await readClaims('education-scanned-synthetic.pdf')
-  assert.equal(claims.length, 2)
-  assert.equal(claims[1]?.value.value, 42)
-})
-test('a scanned PDF is refused where OCR is turned off', async () => {
-  const pdf = await readFile(
-    new URL('../fixtures/education-scanned-synthetic.pdf', import.meta.url),
-  )
-  await assert.rejects(withPdfPages(pdf, () => Promise.resolve(1), { ocr: false }))
-})
-test('PDF temporary source/OCR files purged after success and callback failure', async (t) => {
-  const root = await mkdtemp(join(tmpdir(), 'glimpse-pdf-test-'))
-  t.after(() => rm(root, { recursive: true, force: true }))
-  const pdf = await readFile(new URL('../fixtures/education-synthetic.pdf', import.meta.url))
-  await withPdfPages(pdf, () => Promise.resolve(1), { temporaryRoot: root })
-  assert.deepEqual(await readdir(root), [])
-  await assert.rejects(
-    withPdfPages(pdf, () => Promise.reject(new Error('sensitive callback content')), {
-      temporaryRoot: root,
-    }),
-    (error) => error instanceof Error && !error.message.includes('sensitive'),
-  )
-  assert.deepEqual(await readdir(root), [])
-  await assert.rejects(
-    withPdfPages(new Uint8Array([1, 2]), () => Promise.resolve(1), { temporaryRoot: root }),
-  )
-})
+test(
+  'PDF temporary source/OCR files purged after success and callback failure',
+  pdfTools,
+  async (t) => {
+    const root = await mkdtemp(join(tmpdir(), 'glimpse-pdf-test-'))
+    t.after(() => rm(root, { recursive: true, force: true }))
+    const pdf = await readFile(new URL('../fixtures/education-synthetic.pdf', import.meta.url))
+    await withPdfPages(pdf, () => Promise.resolve(1), { temporaryRoot: root })
+    assert.deepEqual(await readdir(root), [])
+    await assert.rejects(
+      withPdfPages(pdf, () => Promise.reject(new Error('sensitive callback content')), {
+        temporaryRoot: root,
+      }),
+      (error) => error instanceof Error && !error.message.includes('sensitive'),
+    )
+    assert.deepEqual(await readdir(root), [])
+    await assert.rejects(
+      withPdfPages(new Uint8Array([1, 2]), () => Promise.resolve(1), { temporaryRoot: root }),
+    )
+  },
+)
 test('Ollama adapter speaks the real HTTP protocol with bounded JSON and no redirects', async (t) => {
   let mode = 'ok'
   let body = ''
@@ -183,10 +178,4 @@ test('Ollama adapter speaks the real HTTP protocol with bounded JSON and no redi
   await assert.rejects(model.complete('policy', excerptData))
   mode = 'large'
   await assert.rejects(model.complete('policy', excerptData))
-})
-test('reading a PDF leaves the caller’s bytes intact, Node Buffer included', async () => {
-  const pdf = await readFile(new URL('../fixtures/education-synthetic.pdf', import.meta.url))
-  const before = Buffer.from(pdf)
-  await withPdfPages(pdf, () => Promise.resolve(1))
-  assert.deepEqual(Buffer.from(pdf), before)
 })
