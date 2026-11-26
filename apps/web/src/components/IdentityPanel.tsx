@@ -6,11 +6,13 @@ import { signMessage } from 'wagmi/actions'
 
 import type { MessageKey } from '@/lib/i18n/messages.ts'
 import { wagmiConfig } from '@/lib/wagmi.ts'
+import { describeWalletError, walletAccount } from '@/lib/wallet.ts'
 
 import { FilePicker } from './FilePicker.tsx'
+import { ErrorNotice, useFieldErrors } from './Form.tsx'
 import { useI18n } from './I18nProvider.tsx'
 import { useIdentity } from './IdentityProvider.tsx'
-import { connectedAddress, describeWalletError } from './SessionProvider.tsx'
+import { useSession } from './SessionProvider.tsx'
 import { useVault } from './VaultProvider.tsx'
 
 type Step =
@@ -53,8 +55,10 @@ export function VerifiedBadge() {
  */
 export function IdentityPanel() {
   const { request } = useVault()
+  const { address } = useSession()
   const { status, refresh } = useIdentity()
-  const { t, error: te } = useI18n()
+  const { t } = useI18n()
+  const fields = useFieldErrors()
   const [step, setStep] = useState<Step>({ name: 'idle' })
   const [error, setError] = useState<string | null>(null)
 
@@ -72,17 +76,19 @@ export function IdentityPanel() {
 
   async function onCheck(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const chosen = new FormData(event.currentTarget).get('file')
-    if (!(chosen instanceof File) || chosen.size === 0) {
-      setError(t('identity.chooseFirst'))
-      return
-    }
-    const form = new FormData()
-    form.set('file', chosen)
+    const form = event.currentTarget
+    const chosen = new FormData(form).get('file')
+    const ok = fields.report(
+      { file: chosen instanceof File && chosen.size > 0 ? undefined : t('identity.chooseFirst') },
+      form,
+    )
+    if (!ok || !(chosen instanceof File)) return
+    const upload = new FormData()
+    upload.set('file', chosen)
     setError(null)
     setStep({ name: 'checking' })
     try {
-      const res = await request('/api/identity/verify', { method: 'POST', body: form })
+      const res = await request('/api/identity/verify', { method: 'POST', body: upload })
       const body = (await res.json()) as {
         report: IdentityValidationReport
         binding: string | null
@@ -103,8 +109,8 @@ export function IdentityPanel() {
     setError(null)
     setStep({ name: 'signing', report, binding })
     try {
-      await connectedAddress()
-      const signature = await signMessage(wagmiConfig, { message: binding })
+      const account = await walletAccount(address)
+      const signature = await signMessage(wagmiConfig, { account, message: binding })
       await request('/api/identity/bind', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -112,16 +118,15 @@ export function IdentityPanel() {
       })
       await refresh()
     } catch (err) {
-      setError(describeWalletError(err))
+      // The server's own refusals (expired report…) are shown as they are.
+      setError(
+        err instanceof Error && err.name === 'VaultError' ? err.message : describeWalletError(err),
+      )
       setStep({ name: 'passed', report, binding })
     }
   }
 
-  const alert = error && (
-    <p role="alert" className="error">
-      {te(error)}
-    </p>
-  )
+  const alert = <ErrorNotice message={error} />
 
   const progress = (
     <ol className="progress" aria-label={t('import.identityTitle')}>
@@ -184,7 +189,7 @@ export function IdentityPanel() {
   }
 
   return (
-    <form className="card form" onSubmit={onCheck}>
+    <form className="card form" onSubmit={onCheck} noValidate>
       {progress}
       <FilePicker
         name="file"
@@ -192,6 +197,8 @@ export function IdentityPanel() {
         label={t('identity.file')}
         buttonLabel={t('identity.fileButton')}
         hint={t('identity.fileHint')}
+        error={fields.errors.file}
+        onSelect={() => fields.clear('file')}
       />
       <div className="actions">
         <button type="submit" className="button" disabled={step.name === 'checking'}>

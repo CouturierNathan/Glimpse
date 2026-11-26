@@ -3,9 +3,22 @@
 import type { AttestationRecord } from '@glimpse/shared'
 import { indexRegistries, randomBytes, type RegistryIndex } from '@glimpse/verifier'
 import Link from 'next/link'
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
-import { createPublicClient, type Hash, type Hex, http, isAddressEqual } from 'viem'
-import { signTypedData, switchChain, waitForTransactionReceipt, writeContract } from 'wagmi/actions'
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  type Address,
+  createPublicClient,
+  type Hash,
+  type Hex,
+  http,
+  isAddress,
+  isAddressEqual,
+} from 'viem'
+import {
+  signTypedData,
+  simulateContract,
+  waitForTransactionReceipt,
+  writeContract,
+} from 'wagmi/actions'
 
 import {
   appChain,
@@ -26,12 +39,14 @@ import {
 } from '@/lib/issuer.ts'
 import { importAttributes } from '@/lib/vault/attributes.ts'
 import { wagmiConfig } from '@/lib/wagmi.ts'
+import { describeWalletError, walletAccount, WalletError, walletMessages } from '@/lib/wallet.ts'
 
-import { LockIcon } from './AttestationImport.tsx'
+import { LockIcon } from './Icons.tsx'
+import { ErrorNotice, FieldError, Notice, useFieldErrors } from './Form.tsx'
 import { useI18n } from './I18nProvider.tsx'
 import { useIdentity } from './IdentityProvider.tsx'
 import { IssuedList } from './IssuedList.tsx'
-import { connectedAddress, describeWalletError, useSession } from './SessionProvider.tsx'
+import { useSession } from './SessionProvider.tsx'
 
 const DEFAULT_VALID_DAYS = 365
 const client = createPublicClient({ chain: appChain, transport: http() })
@@ -41,23 +56,57 @@ const explorer = appChain.blockExplorers.default.url
 type Busy = 'register' | 'issue' | null
 type Issued = { record: AttestationRecord; tx: Hash }
 
-/** The wallet in the session, checked again right before it signs or sends anything. */
-async function sessionAccount(session: string | null) {
-  const account = await connectedAddress()
-  if (!session || !isAddressEqual(account, session as Hex)) {
-    throw new Error('Your wallet is on another account than the one you signed in with.')
-  }
-  await switchChain(wagmiConfig, { chainId: appChain.id }).catch(() => undefined)
-  return account
-}
-
 /** Waits for a sent transaction to be mined, and refuses one that reverted. */
-async function send(sent: Promise<Hash>): Promise<Hash> {
-  const hash = await sent
+async function confirmed(hash: Hash): Promise<Hash> {
   const receipt = await waitForTransactionReceipt(wagmiConfig, { hash, chainId: appChain.id })
-  if (receipt.status !== 'success') throw new Error('The transaction failed on chain.')
+  if (receipt.status !== 'success') throw new WalletError(walletMessages.txFailed)
   return hash
 }
+
+/*
+ * Each transaction is simulated from the account first: a revert (organisation id taken, wrong
+ * signer…) comes back decoded and nothing is sent. Only then does the wallet ask to send it.
+ */
+async function register(account: Address, name: string): Promise<Hash> {
+  const { request } = await simulateContract(wagmiConfig, {
+    account,
+    chainId: appChain.id,
+    address: issuerRegistry,
+    abi: issuerRegistryAbi,
+    functionName: 'register',
+    args: [randomBytes(16), account, issuerMetadataURI(name)],
+  })
+  return confirmed(await writeContract(wagmiConfig, request))
+}
+
+async function anchor(
+  account: Address,
+  args: readonly [Hex, Hex, Hex, bigint, bigint, Hex],
+): Promise<Hash> {
+  const { request } = await simulateContract(wagmiConfig, {
+    account,
+    chainId: appChain.id,
+    address: attestationRegistry,
+    abi: attestationRegistryAbi,
+    functionName: 'anchor',
+    args,
+  })
+  return confirmed(await writeContract(wagmiConfig, request))
+}
+
+async function revoke(account: Address, attestationId: Hex): Promise<Hash> {
+  const { request } = await simulateContract(wagmiConfig, {
+    account,
+    chainId: appChain.id,
+    address: attestationRegistry,
+    abi: attestationRegistryAbi,
+    functionName: 'revoke',
+    args: [attestationId],
+  })
+  return confirmed(await writeContract(wagmiConfig, request))
+}
+
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /** Issuing is open to a wallet whose identity is verified, like importing. */
 export function IssuerPanel() {
@@ -84,14 +133,17 @@ export function IssuerPanel() {
 
 function Issuer() {
   const { address } = useSession()
-  const { t, attr, error: te } = useI18n()
+  const { t, attr } = useI18n()
+  const fields = useFieldErrors()
   const [index, setIndex] = useState<RegistryIndex | null>(null)
   const [indexError, setIndexError] = useState(false)
   const [busy, setBusy] = useState<Busy>(null)
   const [error, setError] = useState<string | null>(null)
   const [issued, setIssued] = useState<Issued | null>(null)
   const [attribute, setAttribute] = useState(importAttributes[0]?.attribute ?? '')
+  const indexRef = useRef<RegistryIndex | null>(null)
 
+  /** Reads new registry events; returns the index so a caller can wait for its own change. */
   const refresh = useCallback(async () => {
     try {
       setIndexError(false)
@@ -103,22 +155,37 @@ function Issuer() {
           fromBlock: registriesDeployedAt,
           step: INDEX_STEP,
         },
-        index ?? undefined,
+        indexRef.current ?? undefined,
       )
+      indexRef.current = next
       setIndex({ ...next })
+      return next
     } catch {
       setIndexError(true)
+      return null
     }
-  }, [index])
+  }, [])
 
   useEffect(() => {
-    if (index === null && !indexError) void refresh()
-  }, [index, indexError, refresh])
+    void refresh()
+  }, [refresh])
 
-  const mine = address
-    ? [...(index?.issuers ?? [])].filter(([, entry]) => isAddressEqual(entry.admin, address as Hex))
-    : []
-  const [issuerId, issuer] = mine[0] ?? []
+  const mineOf = (from: RegistryIndex | null) =>
+    address
+      ? [...(from?.issuers ?? [])].filter(([, entry]) =>
+          isAddressEqual(entry.admin, address as Hex),
+        )
+      : []
+  const [issuerId, issuer] = mineOf(index)[0] ?? []
+
+  /** The indexing RPC can lag the chain by a few blocks: wait until it shows the change. */
+  async function refreshUntil(done: (next: RegistryIndex) => boolean) {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const next = await refresh()
+      if (next && done(next)) return
+      await pause(2500)
+    }
+  }
 
   async function run(kind: Exclude<Busy, null>, action: () => Promise<void>) {
     setBusy(kind)
@@ -126,9 +193,7 @@ function Issuer() {
     try {
       await action()
     } catch (e) {
-      setError(
-        e instanceof Error && e.name === 'IssuerInputError' ? e.message : describeWalletError(e),
-      )
+      setError(describeWalletError(e))
     } finally {
       setBusy(null)
     }
@@ -136,43 +201,67 @@ function Issuer() {
 
   function onRegister(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const name = String(new FormData(event.currentTarget).get('name'))
+    const form = event.currentTarget
+    const name = String(new FormData(form).get('orgName')).trim()
+    const ok = fields.report(
+      {
+        orgName: !name
+          ? t('form.required')
+          : name.length > 80
+            ? t('form.tooLong', { max: 80 })
+            : undefined,
+      },
+      form,
+    )
+    if (!ok) return
     void run('register', async () => {
-      const uri = issuerMetadataURI(name)
-      const account = await sessionAccount(address)
-      await send(
-        writeContract(wagmiConfig, {
-          address: issuerRegistry,
-          abi: issuerRegistryAbi,
-          functionName: 'register',
-          args: [randomBytes(16), account, uri],
-          chainId: appChain.id,
-        }),
-      )
-      await refresh()
+      const account = await walletAccount(address)
+      await register(account, name)
+      await refreshUntil((next) => mineOf(next).length > 0)
     })
   }
 
   function onIssue(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!issuerId || !issuer) return
-    const form = new FormData(event.currentTarget)
+    const form = event.currentTarget
+    const data = new FormData(form)
+    const holder = String(data.get('holder')).trim()
+    const validDays = Number(data.get('validDays'))
     const type = importAttributes.find((a) => a.attribute === attribute)?.type ?? 'string'
+    let value
+    let valueError: string | undefined
+    try {
+      value = parseAttestedValue(type, String(data.get('value') ?? ''))
+    } catch {
+      valueError =
+        type === 'number' ? t('form.number') : type === 'date' ? t('form.date') : t('form.required')
+    }
+    const ok = fields.report(
+      {
+        holder: !holder ? t('form.required') : !isAddress(holder) ? t('form.address') : undefined,
+        value: valueError,
+        validDays:
+          Number.isInteger(validDays) && validDays >= 1 && validDays <= MAX_VALID_DAYS
+            ? undefined
+            : t('form.range', { min: 1, max: MAX_VALID_DAYS }),
+      },
+      form,
+    )
+    if (!ok || !value) return
     void run('issue', async () => {
+      const account = await walletAccount(address)
+      if (!isAddressEqual(account, issuer.signer)) throw new WalletError(walletMessages.signerOnly)
       const draft = draftAttestation({
         issuerId,
-        holder: String(form.get('holder')).trim(),
+        holder,
         attribute,
-        value: parseAttestedValue(type, String(form.get('value'))),
+        value,
         issuedAt: Number((await client.getBlock()).timestamp),
-        validDays: Number(form.get('validDays')),
+        validDays,
         chainId: appChain.id,
         attestationRegistry,
       })
-      const account = await sessionAccount(address)
-      if (!isAddressEqual(account, issuer.signer)) {
-        throw new Error("Sign with the organisation's signer wallet.")
-      }
       const signature = await signTypedData(wagmiConfig, {
         account,
         domain: draft.domain,
@@ -181,17 +270,16 @@ function Issuer() {
         message: draft.message,
       })
       const { attestationId, issuerId: id, commitment, issuedAt, expiresAt } = draft.message
-      const tx = await send(
-        writeContract(wagmiConfig, {
-          address: attestationRegistry,
-          abi: attestationRegistryAbi,
-          functionName: 'anchor',
-          args: [attestationId, id, commitment, issuedAt, expiresAt, signature],
-          chainId: appChain.id,
-        }),
-      )
+      const tx = await anchor(account, [
+        attestationId,
+        id,
+        commitment,
+        issuedAt,
+        expiresAt,
+        signature,
+      ])
       setIssued({ record: draft.record(signature), tx })
-      await refresh()
+      await refreshUntil((next) => next.attestations.has(attestationId))
     })
   }
 
@@ -199,16 +287,14 @@ function Issuer() {
     return (
       <div className="card" aria-live="polite">
         {indexError ? (
-          <>
-            <p role="alert" className="error">
-              {t('issue.readFailed')}
-            </p>
-            <div className="actions">
-              <button type="button" className="button quiet" onClick={() => void refresh()}>
+          <ErrorNotice
+            message={t('issue.readFailed')}
+            action={
+              <button type="button" className="button quiet small" onClick={() => void refresh()}>
                 {t('common.tryAgain')}
               </button>
-            </div>
-          </>
+            }
+          />
         ) : (
           <p className="hint loading-line">
             <span className="spinner" aria-hidden="true" />
@@ -219,34 +305,30 @@ function Issuer() {
     )
   }
 
-  const alert = error && (
-    <p role="alert" className="error">
-      {te(error)}
-    </p>
-  )
-
   if (!issuerId || !issuer) {
     return (
-      <form className="card form" onSubmit={onRegister}>
+      <form className="card form" onSubmit={onRegister} noValidate>
         <h3>{t('issue.register.title')}</h3>
         <p className="hint">{t('issue.register.hint')}</p>
         <div className="field">
-          <label htmlFor="name">{t('issue.register.name')}</label>
+          <label htmlFor="orgName">{t('issue.register.name')}</label>
           <input
-            id="name"
-            name="name"
-            required
+            id="orgName"
+            name="orgName"
             maxLength={80}
             placeholder={t('issue.register.placeholder')}
+            {...fields.control('orgName')}
           />
+          <FieldError name="orgName" message={fields.errors.orgName} />
         </div>
+        <p className="hint">{t('issue.gasHint')}</p>
         <div className="actions">
           <button type="submit" className="button" disabled={busy !== null}>
             {busy === 'register' && <span className="spinner" aria-hidden="true" />}
             {busy === 'register' ? t('issue.confirmWallet') : t('issue.register.submit')}
           </button>
         </div>
-        {alert}
+        <ErrorNotice message={error} />
       </form>
     )
   }
@@ -261,14 +343,10 @@ function Issuer() {
         {t('issue.as')} <strong>{issuerName(issuer.metadataURI)}</strong>
       </p>
       {issued ? (
-        <div className="card request-status">
-          <p className="success-line">
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="m3.5 8.5 3 3 6-7" />
-            </svg>
-            {t('issue.done.title')}
-          </p>
-          <p className="hint">{t('issue.done.hint')}</p>
+        <div className="card result">
+          <Notice tone="success" title={t('issue.done.title')}>
+            {t('issue.done.hint')}
+          </Notice>
           <div className="actions">
             <a
               className="button"
@@ -291,17 +369,19 @@ function Issuer() {
           </div>
         </div>
       ) : (
-        <form className="card form" onSubmit={onIssue}>
+        <form className="card form" onSubmit={onIssue} noValidate>
           <h3>{t('issue.form.title')}</h3>
           <div className="field">
             <label htmlFor="holder">{t('issue.form.holder')}</label>
             <input
               id="holder"
               name="holder"
-              required
-              pattern="0x[0-9a-fA-F]{40}"
               placeholder="0x…"
+              autoComplete="off"
+              spellCheck={false}
+              {...fields.control('holder')}
             />
+            <FieldError name="holder" message={fields.errors.holder} />
           </div>
           <div className="field">
             <label htmlFor="attribute">{t('issue.form.attribute')}</label>
@@ -309,7 +389,10 @@ function Issuer() {
               id="attribute"
               name="attribute"
               value={attribute}
-              onChange={(e) => setAttribute(e.target.value)}
+              onChange={(e) => {
+                setAttribute(e.target.value)
+                fields.clear('value')
+              }}
             >
               {importAttributes.map((a) => (
                 <option key={a.attribute} value={a.attribute}>
@@ -329,11 +412,13 @@ function Issuer() {
               <input
                 id="value"
                 name="value"
-                required
+                key={attribute}
                 type={type === 'number' ? 'number' : type === 'date' ? 'date' : 'text'}
                 step="any"
+                {...fields.control('value')}
               />
             )}
+            <FieldError name="value" message={fields.errors.value} />
           </div>
           <div className="field">
             <label htmlFor="validDays">{t('issue.form.validDays')}</label>
@@ -341,11 +426,12 @@ function Issuer() {
               id="validDays"
               name="validDays"
               type="number"
-              required
               min={1}
               max={MAX_VALID_DAYS}
               defaultValue={DEFAULT_VALID_DAYS}
+              {...fields.control('validDays')}
             />
+            <FieldError name="validDays" message={fields.errors.validDays} />
           </div>
           <div className="actions">
             <button type="submit" className="button" disabled={busy !== null}>
@@ -353,28 +439,18 @@ function Issuer() {
               {busy === 'issue' ? t('issue.form.busy') : t('issue.form.submit')}
             </button>
           </div>
-          {alert}
+          <ErrorNotice message={error} />
         </form>
       )}
       <h2 className="section-title">{t('issue.list.title')}</h2>
       <IssuedList
         issuerId={issuerId}
         index={index}
-        onRevoke={(attestationId) =>
-          sessionAccount(address)
-            .then(() =>
-              send(
-                writeContract(wagmiConfig, {
-                  address: attestationRegistry,
-                  abi: attestationRegistryAbi,
-                  functionName: 'revoke',
-                  args: [attestationId],
-                  chainId: appChain.id,
-                }),
-              ),
-            )
-            .then(refresh)
-        }
+        onRevoke={async (attestationId) => {
+          const account = await walletAccount(address)
+          await revoke(account, attestationId)
+          await refreshUntil((next) => next.attestations.get(attestationId)?.revokedAt !== 0n)
+        }}
       />
     </>
   )

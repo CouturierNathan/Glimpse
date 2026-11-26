@@ -6,8 +6,10 @@ import type { Hex } from 'viem'
 
 import { type Status } from '@/lib/status.ts'
 
+import { describeWalletError } from '@/lib/wallet.ts'
+
+import { ConfirmButton, ErrorNotice } from './Form.tsx'
 import { useI18n } from './I18nProvider.tsx'
-import { describeWalletError } from './SessionProvider.tsx'
 import { StatusBadge } from './StatusBadge.tsx'
 
 /** What the index says, for listing only: a requester's verdict always comes from verify(). */
@@ -26,7 +28,7 @@ export function IssuedList({
   index: RegistryIndex
   onRevoke: (attestationId: Hex) => Promise<unknown>
 }) {
-  const { t, error: te, date: format } = useI18n()
+  const { t, date: format } = useI18n()
   const date = (seconds: bigint) => format(Number(seconds) * 1000, { dateStyle: 'medium' })
   const [busy, setBusy] = useState<Hex | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -59,11 +61,13 @@ export function IssuedList({
               </div>
               <div className="item-actions">
                 {status !== 'revoked' && (
-                  <button
-                    type="button"
-                    className="button quiet small danger"
+                  <ConfirmButton
+                    label={busy === id ? t('issue.confirmWallet') : t('issue.list.revoke')}
                     disabled={busy !== null}
-                    onClick={async () => {
+                    title={t('issue.list.revokeTitle')}
+                    text={t('issue.list.revokeText')}
+                    confirmLabel={t('issue.list.revoke')}
+                    onConfirm={async () => {
                       setBusy(id)
                       setError(null)
                       try {
@@ -74,20 +78,14 @@ export function IssuedList({
                         setBusy(null)
                       }
                     }}
-                  >
-                    {busy === id ? t('issue.confirmWallet') : t('issue.list.revoke')}
-                  </button>
+                  />
                 )}
               </div>
             </li>
           )
         })}
       </ul>
-      {error && (
-        <p role="alert" className="error">
-          {te(error)}
-        </p>
-      )}
+      <ErrorNotice message={error} />
       <p className="hint">{t('issue.list.hint')}</p>
     </div>
   )

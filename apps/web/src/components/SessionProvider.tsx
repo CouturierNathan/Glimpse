@@ -1,14 +1,14 @@
 'use client'
 
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react'
-import { type Address, UserRejectedRequestError } from 'viem'
+import type { Address } from 'viem'
 import { createSiweMessage } from 'viem/siwe'
-import { ProviderNotFoundError } from 'wagmi'
-import { connect, disconnect, getConnection, signMessage } from 'wagmi/actions'
+import { disconnect, signMessage } from 'wagmi/actions'
 
 import { SIWE_MESSAGE_TTL_MS } from '@/lib/auth/siwe.ts'
 import { appChain } from '@/lib/chains.ts'
 import { wagmiConfig } from '@/lib/wagmi.ts'
+import { describeWalletError, walletAccount, walletMessages } from '@/lib/wallet.ts'
 
 type Status = 'loading' | 'signed-out' | 'signing-in' | 'signed-in'
 
@@ -26,28 +26,6 @@ export function useSession(): SessionContextValue {
   const value = useContext(SessionContext)
   if (!value) throw new Error('useSession must be used inside <SessionProvider>')
   return value
-}
-
-/** The wallet's address, connecting it first if needed. */
-export async function connectedAddress(): Promise<Address> {
-  const connection = getConnection(wagmiConfig)
-  if (connection.status === 'connected') return connection.address
-  const [connector] = wagmiConfig.connectors
-  if (!connector) throw new ProviderNotFoundError()
-  const { accounts } = await connect(wagmiConfig, { connector })
-  return accounts[0]
-}
-
-/** A wallet error in words the user can act on. */
-export function describeWalletError(error: unknown): string {
-  if (error instanceof ProviderNotFoundError) {
-    return 'No browser wallet found. Install MetaMask or another Ethereum wallet.'
-  }
-  if (error instanceof Error && error.cause instanceof UserRejectedRequestError) {
-    return 'You cancelled the request in your wallet.'
-  }
-  if (error instanceof UserRejectedRequestError) return 'You cancelled the request in your wallet.'
-  return error instanceof Error ? error.message : 'Sign-in failed, try again.'
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -69,7 +47,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setStatus('signing-in')
     setError(null)
     try {
-      const account = await connectedAddress()
+      const account = await walletAccount()
       const { nonce } = (await (await fetch('/api/auth/nonce')).json()) as { nonce: string }
       const issuedAt = new Date()
       const message = createSiweMessage({
@@ -83,7 +61,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         issuedAt,
         expirationTime: new Date(issuedAt.getTime() + SIWE_MESSAGE_TTL_MS),
       })
-      const signature = await signMessage(wagmiConfig, { message })
+      const signature = await signMessage(wagmiConfig, { account, message })
 
       const res = await fetch('/api/auth/verify', {
         method: 'POST',
@@ -91,12 +69,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ message, signature }),
       })
       const body = (await res.json()) as { address?: Address; error?: string }
-      if (!res.ok || !body.address) throw new Error(body.error ?? 'Sign-in failed, try again.')
+      if (!res.ok || !body.address) throw new Error(body.error ?? walletMessages.signInFailed)
 
       setAddress(body.address)
       setStatus('signed-in')
     } catch (err) {
-      setError(describeWalletError(err))
+      // A message from our own server (expired nonce, bad signature) is shown as it is.
+      setError(
+        err instanceof Error && err.name === 'Error' ? err.message : describeWalletError(err),
+      )
       setStatus('signed-out')
     }
   }, [])

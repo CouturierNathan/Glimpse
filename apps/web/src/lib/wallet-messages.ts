@@ -1,0 +1,25 @@
+/** What the app says about a wallet, chain or contract failure (French in lib/i18n/messages.ts). */
+export const walletMessages = {
+  none: 'No browser wallet found. Install MetaMask or another Ethereum wallet.',
+  cancelled: 'You cancelled the request in your wallet.',
+  unauthorized:
+    'Your wallet has not authorised this site for this account. Open your wallet, connect this account to the site, then try again.',
+  locked: 'Unlock your wallet, then try again.',
+  pending: 'Your wallet already has a request waiting. Open it to answer.',
+  otherAccount: 'Your wallet is on another account than the one you signed in with.',
+  wrongChain: 'Switch your wallet to the Base Sepolia network, then try again.',
+  funds: 'This account has no Base Sepolia ETH to pay the network fee. Get some from a faucet.',
+  network: 'The network did not answer. Check your connection and try again.',
+  txFailed: 'The transaction failed on chain.',
+  signInFailed: 'Sign-in failed, try again.',
+  signerOnly: 'Sign with the organisation’s signer wallet.',
+  issuerExists: 'This organisation id is already taken. Try again.',
+  notSigner: 'This wallet is not the organisation’s signer.',
+  notIssuer: 'Only the organisation that issued this attestation can revoke it.',
+  alreadyAnchored: 'This attestation is already recorded.',
+  alreadyRevoked: 'This attestation is already revoked.',
+  invalidValidity: 'The validity dates are not accepted by the registry.',
+  badSignature: 'The organisation’s signature does not match this attestation.',
+  unknownIssuer: 'This organisation is not registered on chain.',
+  generic: 'The wallet operation failed. Try again.',
+} as const

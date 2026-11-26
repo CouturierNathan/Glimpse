@@ -8,15 +8,33 @@ import {
 } from '@glimpse/verifier'
 import { type Address, getAddress, type Hex, isAddress, isAddressEqual, parseAbi } from 'viem'
 
+// The custom errors are listed so a simulated call decodes a revert into its name.
 export const issuerRegistryAbi = parseAbi([
   'struct Issuer { address admin; address signer; string metadataURI; }',
   'function register(bytes16 issuerId, address signer, string metadataURI)',
   'function getIssuer(bytes16 issuerId) view returns (Issuer)',
+  'error InvalidIssuerId()',
+  'error InvalidSigner()',
+  'error IssuerExists(bytes16 issuerId)',
+  'error UnknownIssuer(bytes16 issuerId)',
+  'error NotIssuerAdmin(bytes16 issuerId, address caller)',
 ])
 
 export const attestationRegistryAbi = parseAbi([
   'function anchor(bytes16 attestationId, bytes16 issuerId, bytes32 commitment, uint64 issuedAt, uint64 expiresAt, bytes signature)',
   'function revoke(bytes16 attestationId)',
+  'error InvalidAttestationId()',
+  'error InvalidValidity()',
+  'error AlreadyAnchored(bytes16 attestationId)',
+  'error NotIssuerSigner(bytes16 issuerId, address signer)',
+  'error UnknownAttestation(bytes16 attestationId)',
+  'error AlreadyRevoked(bytes16 attestationId)',
+  'error NotIssuer(bytes16 issuerId, address caller)',
+  // Raised by the registries this one calls, or by OpenZeppelin's ECDSA.recover.
+  'error UnknownIssuer(bytes16 issuerId)',
+  'error ECDSAInvalidSignature()',
+  'error ECDSAInvalidSignatureLength(uint256 length)',
+  'error ECDSAInvalidSignatureS(bytes32 s)',
 ])
 
 const DAY_SECONDS = 24 * 3600

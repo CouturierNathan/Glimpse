@@ -4,12 +4,13 @@ import type { Route } from 'next'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
+import { ErrorNotice } from './Form.tsx'
 import { useI18n } from './I18nProvider.tsx'
 import { useSession } from './SessionProvider.tsx'
 
 export function SignInPanel({ next }: { next: Route }) {
   const { status, error, signIn } = useSession()
-  const { t, error: te } = useI18n()
+  const { t } = useI18n()
   const router = useRouter()
 
   useEffect(() => {
@@ -38,11 +39,7 @@ export function SignInPanel({ next }: { next: Route }) {
         {status === 'signing-in' && <span className="spinner" aria-hidden="true" />}
         {status === 'signing-in' ? t('signIn.busy') : t('signIn.button')}
       </button>
-      {error && (
-        <p role="alert" className="error">
-          {te(error)}
-        </p>
-      )}
+      <ErrorNotice message={error} />
     </div>
   )
 }
