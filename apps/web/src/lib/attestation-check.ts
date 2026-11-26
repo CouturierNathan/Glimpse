@@ -1,9 +1,9 @@
 import type { AttestationRecord } from '@glimpse/shared'
 import { createPublicClient, type Hex, http, parseAbi, zeroAddress } from 'viem'
 
-import { appChain, attestationRegistry } from './chains.ts'
+import { appChain, attestationRegistry, appRpc } from './chains.ts'
 
-const client = createPublicClient({ chain: appChain, transport: http() })
+const client = createPublicClient({ chain: appChain, transport: http(appRpc) })
 const registryAbi = parseAbi([
   'struct Anchor { bytes16 issuerId; address signer; uint64 issuedAt; uint64 expiresAt; uint64 revokedAt; bytes32 commitment; }',
   'function getAnchor(bytes16 attestationId) view returns (Anchor)',

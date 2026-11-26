@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { formatClaimValue } from '@/lib/format.ts'
 import { holderStatus } from '@/lib/status.ts'
 
-import { ConfirmButton, ErrorNotice } from './Form.tsx'
+import { ConfirmButton, ErrorNotice, Notice } from './Form.tsx'
 import { useI18n } from './I18nProvider.tsx'
 import { StatusBadge } from './StatusBadge.tsx'
 import { useVault, type VaultItem } from './VaultProvider.tsx'
@@ -36,7 +36,7 @@ function Row({ item }: { item: VaultItem }) {
       <div className="item-name">
         <strong>{attr(item.attribute)}</strong>
         <span className="item-meta">
-          <StatusBadge status={holderStatus(item.sourceClass)} />
+          <StatusBadge status={holderStatus(item.sourceClass, item.verdict)} />
           <span className="source-badge" data-source={item.sourceClass}>
             {t(sourceKey[item.sourceClass])}
           </span>
@@ -83,8 +83,14 @@ function Row({ item }: { item: VaultItem }) {
 }
 
 export function VaultList() {
-  const { items, ready } = useVault()
+  const { items, ready, arrived } = useVault()
   const { t } = useI18n()
+  const notice =
+    arrived > 0 ? (
+      <Notice tone="success">
+        {arrived === 1 ? t('vault.arrived') : t('vault.arrivedMany', { count: arrived })}
+      </Notice>
+    ) : null
 
   if (!ready) {
     return (
@@ -115,24 +121,27 @@ export function VaultList() {
   }
 
   return (
-    <div className="vault card">
-      <div className="vault-head">
-        <p className="vault-count">
-          {items.length === 1 ? t('vault.countOne') : t('vault.count', { count: items.length })}
+    <>
+      {notice}
+      <div className="vault card">
+        <div className="vault-head">
+          <p className="vault-count">
+            {items.length === 1 ? t('vault.countOne') : t('vault.count', { count: items.length })}
+          </p>
+          <Link href="/import" className="button quiet small">
+            {t('vault.add')}
+          </Link>
+        </div>
+        <ul className="items">
+          {items.map((item) => (
+            <Row key={item.reference} item={item} />
+          ))}
+        </ul>
+        <p className="hint">
+          {t('vault.shareHint')} <Link href="/consent">{t('vault.shareLink')}</Link>
         </p>
-        <Link href="/import" className="button quiet small">
-          {t('vault.add')}
-        </Link>
+        <p className="hint">{t('vault.keyHint')}</p>
       </div>
-      <ul className="items">
-        {items.map((item) => (
-          <Row key={item.reference} item={item} />
-        ))}
-      </ul>
-      <p className="hint">
-        {t('vault.shareHint')} <Link href="/consent">{t('vault.shareLink')}</Link>
-      </p>
-      <p className="hint">{t('vault.keyHint')}</p>
-    </div>
+    </>
   )
 }

@@ -52,6 +52,19 @@ export class HolderRegistry {
     return keys.length === 0 ? null : { holderId, encryptionKeyIds: keys }
   }
 
+  /** The wallet's holder and its most recently registered public keys, to encrypt for it. */
+  async publicKeysOf(
+    address: string,
+    chainId: number,
+    limit = 4,
+  ): Promise<{ holderId: string; keys: { recipientKeyId: string; publicKey: string }[] }> {
+    const holderId = this.ensure(address, chainId)
+    const keys = Object.entries(await this.#keys(holderId))
+      .slice(-limit)
+      .map(([recipientKeyId, publicKey]) => ({ recipientKeyId, publicKey }))
+    return { holderId, keys }
+  }
+
   /** A registered public key, so a holder can wrap an item key for this recipient. */
   async publicKey(holderId: string, keyId: string): Promise<string | null> {
     return (await this.#keys(holderId))[keyId] ?? null

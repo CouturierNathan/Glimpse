@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import { type NextRequest, NextResponse } from 'next/server'
 import { createPublicClient, http } from 'viem'
 
-import { appChain } from '@/lib/chains.ts'
+import { appChain, appRpc } from '@/lib/chains.ts'
 import { nonces, secureCookie } from '@/lib/auth/server.ts'
 import {
   createSessionToken,
@@ -12,7 +12,7 @@ import {
 } from '@/lib/auth/session.ts'
 import { NONCE_COOKIE, parseSignInBody, verifySignIn } from '@/lib/auth/siwe.ts'
 
-const client = createPublicClient({ chain: appChain, transport: http() })
+const client = createPublicClient({ chain: appChain, transport: http(appRpc) })
 
 /** Checks a signed SIWE message and opens a session for its signer. */
 export async function POST(request: NextRequest) {

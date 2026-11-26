@@ -117,7 +117,7 @@ const en = {
   'source.B.title': 'From a checked document',
   'source.B.text':
     'Read from a document whose origin Glimpse could check. That does not make it authentic: no organisation stands behind the value itself.',
-  'source.C': 'Authentic',
+  'source.C': 'Issued by an organisation',
   'source.C.title': 'Authentic, attested by an organisation',
   'source.C.text':
     'An organisation signed this information and recorded it on chain. It is the only kind a requester can verify end to end.',
@@ -365,6 +365,12 @@ const en = {
   'issue.form.validDays': 'Valid for (days)',
   'issue.form.submit': 'Sign and record',
   'issue.form.busy': 'Sign, then confirm in your wallet…',
+  'issue.delivering': 'Handing it to the holder’s vault…',
+  'issue.delivered':
+    'Delivered to the holder’s vault, encrypted for their keys: it appears there, checked on chain, the next time they open Glimpse. The file below is a spare copy.',
+  'issue.notDelivered': 'The holder has never opened Glimpse with this wallet: hand them the file.',
+  'vault.arrived': 'New attestation received from an organisation, checked on chain.',
+  'vault.arrivedMany': '{count} new attestations received from organisations, checked on chain.',
   'issue.done.title': 'Attestation recorded',
   'issue.done.hint':
     'Send this file to the holder. It holds the value and its salt: only they should get it. The chain only keeps a salted commitment.',
@@ -594,7 +600,7 @@ const fr: Messages = {
   'source.B.title': 'Issue d’un document vérifié',
   'source.B.text':
     'Lue dans un document dont Glimpse a pu contrôler l’origine. Cela ne la rend pas authentique : aucune organisation ne s’engage sur la valeur elle-même.',
-  'source.C': 'Authentique',
+  'source.C': 'Émise par une organisation',
   'source.C.title': 'Authentique, attestée par une organisation',
   'source.C.text':
     'Une organisation a signé cette information et l’a inscrite sur la blockchain. C’est la seule catégorie qu’un demandeur peut vérifier de bout en bout.',
@@ -836,6 +842,14 @@ const fr: Messages = {
   'issue.form.validDays': 'Validité (jours)',
   'issue.form.submit': 'Signer et inscrire',
   'issue.form.busy': 'Signez, puis confirmez dans votre portefeuille…',
+  'issue.delivering': 'Remise dans le coffre du titulaire…',
+  'issue.delivered':
+    'Remise dans le coffre du titulaire, chiffrée pour ses clés : elle y apparaît, vérifiée sur la blockchain, à sa prochaine ouverture de Glimpse. Le fichier ci-dessous est une copie de secours.',
+  'issue.notDelivered':
+    'Le titulaire n’a jamais ouvert Glimpse avec ce portefeuille : remettez-lui le fichier.',
+  'vault.arrived': 'Nouvelle attestation reçue d’une organisation, vérifiée sur la blockchain.',
+  'vault.arrivedMany':
+    '{count} nouvelles attestations reçues d’organisations, vérifiées sur la blockchain.',
   'issue.done.title': 'Attestation inscrite',
   'issue.done.hint':
     'Envoyez ce fichier au titulaire. Il contient la valeur et son sel : lui seul doit le recevoir. La blockchain ne garde qu’un engagement salé.',
@@ -997,6 +1011,8 @@ export const errorTranslations: Record<string, string> = {
   'Key id already bound to another key': 'Cet identifiant de clé est déjà lié à une autre clé.',
   'Too many keys': 'Trop de clés enregistrées. Reconnectez-vous.',
   'Invalid key id': 'Identifiant de clé invalide.',
+  'This holder has too many attestations waiting.':
+    'Trop d’attestations attendent déjà ce titulaire.',
   'The registries could not be read from the chain.':
     'Les registres n’ont pas pu être lus sur la blockchain.',
   'Unknown holder': 'Titulaire inconnu. Reconnectez-vous.',

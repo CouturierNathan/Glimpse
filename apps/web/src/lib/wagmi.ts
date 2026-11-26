@@ -1,10 +1,10 @@
 import { createConfig, http, injected } from 'wagmi'
 
-import { appChain } from './chains.ts'
+import { appChain, appRpc } from './chains.ts'
 
 export const wagmiConfig = createConfig({
   chains: [appChain],
   connectors: [injected()],
-  transports: { [appChain.id]: http() },
+  transports: { [appChain.id]: http(appRpc) },
   ssr: true,
 })

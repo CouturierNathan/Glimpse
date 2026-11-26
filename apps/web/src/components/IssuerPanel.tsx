@@ -22,6 +22,7 @@ import {
 
 import {
   appChain,
+  appRpc,
   attestationRegistry,
   INDEX_STEP,
   indexRpc,
@@ -40,6 +41,7 @@ import {
 import { decodeRegistryIndex, loadRegistryIndex, saveRegistryIndex } from '@/lib/registry-cache.ts'
 import { importAttributes } from '@/lib/vault/attributes.ts'
 import { wagmiConfig } from '@/lib/wagmi.ts'
+import { deliverAttestation } from '@/lib/attestation-delivery.ts'
 import { describeWalletError, walletAccount, WalletError, walletMessages } from '@/lib/wallet.ts'
 
 import { LockIcon } from './Icons.tsx'
@@ -51,12 +53,13 @@ import { IssuedList } from './IssuedList.tsx'
 import { useSession } from './SessionProvider.tsx'
 
 const DEFAULT_VALID_DAYS = 365
-const client = createPublicClient({ chain: appChain, transport: http() })
+const client = createPublicClient({ chain: appChain, transport: http(appRpc) })
 const indexClient = createPublicClient({ chain: appChain, transport: http(indexRpc) })
 const explorer = appChain.blockExplorers.default.url
 
 type Busy = 'register' | 'issue' | null
-type Issued = { record: AttestationRecord; tx: Hash }
+/** `delivered`: null while handing it to the holder's vault, then whether that worked. */
+type Issued = { record: AttestationRecord; tx: Hash; delivered: boolean | null }
 
 /** Waits for a sent transaction to be mined, and refuses one that reverted. */
 async function confirmed(hash: Hash): Promise<Hash> {
@@ -301,7 +304,11 @@ function Issuer() {
         expiresAt,
         signature,
       ])
-      setIssued({ record: draft.record(signature), tx })
+      const record = draft.record(signature)
+      setIssued({ record, tx, delivered: null })
+      // Straight to the holder's vault, encrypted for the keys their browsers registered.
+      const delivered = await deliverAttestation(record).catch(() => false)
+      setIssued({ record, tx, delivered })
       await refreshUntil((next) => next.attestations.has(attestationId))
     })
   }
@@ -374,18 +381,24 @@ function Issuer() {
       {issued ? (
         <div className="card result">
           <Notice tone="success" title={t('issue.done.title')}>
-            {t('issue.done.hint')}
+            {issued.delivered === null
+              ? t('issue.delivering')
+              : issued.delivered
+                ? t('issue.delivered')
+                : t('issue.notDelivered')}
           </Notice>
           {/*
            * The chain holds a salted commitment, never the value, so anchoring alone leaves the
            * holder with nothing to see. Saying it as the next step, rather than as a note under
            * the confirmation, is what stops an issuer waiting for a vault that will stay empty.
            */}
-          <ol className="handover">
-            <li>{t('issue.done.step1')}</li>
-            <li>{t('issue.done.step2')}</li>
-            <li>{t('issue.done.step3')}</li>
-          </ol>
+          {issued.delivered === false && (
+            <ol className="handover">
+              <li>{t('issue.done.step1')}</li>
+              <li>{t('issue.done.step2')}</li>
+              <li>{t('issue.done.step3')}</li>
+            </ol>
+          )}
           <div className="actions">
             <a
               className="button"

@@ -272,7 +272,7 @@ export function RequestReview({ requestId }: { requestId: string }) {
                           {...(index === 0 && i === 0 ? { 'data-field': 'choice' } : {})}
                         />
                         <span>{shown(preview[option.reference])}</span>
-                        <StatusBadge status={holderStatus(option.sourceClass)} />
+                        <StatusBadge status={holderStatus(option.sourceClass, option.verdict)} />
                       </label>
                     ))}
                     <label className="check choice">

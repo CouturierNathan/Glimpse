@@ -6,6 +6,7 @@ import type { AuthenticatedHolder, ExtractionModel, StorageBackend } from '@glim
 import { getSession } from '@/lib/auth/server.ts'
 import type { Session } from '@/lib/auth/session.ts'
 
+import { Inbox } from '@/lib/inbox.ts'
 import { RequestRepository } from '@/lib/requests.ts'
 import type { Kv } from '@/lib/state/kv.ts'
 import { derivedKey, redisConfig, stateKv } from '@/lib/state/server.ts'
@@ -42,6 +43,7 @@ export const stateStore: Kv = {
 export const holders = new HolderRegistry(stateStore, () => derivedKey('holder-id'))
 export const consents = new ExtractionConsentStore(stateStore)
 export const requests = new RequestRepository(stateStore)
+export const inbox = new Inbox(stateStore)
 
 /**
  * The vault's server module, imported once per process. The import is bundled, not left to Node

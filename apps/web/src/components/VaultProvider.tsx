@@ -18,6 +18,8 @@ import {
   generateEncryptionKeys,
   generateOpaqueId,
   type ItemExpectation,
+  fingerprintBytes,
+  fingerprintRecord,
   packEncryptedItem,
   verifyEncryptedItem,
   wrapForRequester,
@@ -32,6 +34,10 @@ import {
   useState,
 } from 'react'
 
+import { attestationVerdict, fromBase64 } from '@/lib/attestation-delivery.ts'
+import { anchorStatus } from '@/lib/attestation-check.ts'
+import { appChain, attestationRegistry } from '@/lib/chains.ts'
+import { readAttestationFile } from '@/lib/issuer.ts'
 import {
   deleteLocalVault,
   loadLocalVault,
@@ -66,6 +72,8 @@ interface VaultContextValue {
   withdraw: (requestId: string) => Promise<void>
   /** True once the keys and the items kept in this browser are loaded. */
   ready: boolean
+  /** Attestations organisations sent that this vault picked up since it opened. */
+  arrived: number
   /** Signs out and deletes the keys and items this browser kept. */
   signOut: () => Promise<void>
 }
@@ -162,7 +170,7 @@ async function register(identity: EncryptionIdentity): Promise<void> {
  */
 export function VaultProvider({ children }: { children: ReactNode }) {
   const { address, signOut: endSession } = useSession()
-  const { refresh: refreshIdentity } = useIdentity()
+  const { refresh: refreshIdentity, status: identityStatus } = useIdentity()
   const [items, setItems] = useState<VaultItem[]>([])
   const [ready, setReady] = useState(false)
   const identity = useRef<Promise<EncryptionIdentity> | null>(null)
@@ -260,6 +268,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     async (
       attribute: string,
       encrypt: (holder: EncryptionIdentity, options: ItemOptions) => Promise<EncryptedItem>,
+      extra: Partial<VaultItem> = {},
     ): Promise<VaultItem> => {
       const holder = await keys()
       const { record, envelope, recordDigest } = await encrypt(holder, {
@@ -276,6 +285,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       const { reference } = (await res.json()) as { reference: string }
 
       const item: VaultItem = {
+        ...extra,
         reference,
         attribute,
         sourceClass: record.sourceClass,
@@ -301,10 +311,27 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     [save],
   )
 
+  /** Records where an attestation stands on chain, checked here by the verifier. */
+  const check = useCallback(async (reference: string, record: AttestationRecord) => {
+    const verdict = await attestationVerdict(record).catch(() => 'undetermined' as const)
+    setItems((current) =>
+      current.map((i) =>
+        i.reference === reference ? { ...i, verdict, checkedAt: new Date().toISOString() } : i,
+      ),
+    )
+  }, [])
+
   const storeAttestation = useCallback(
-    (record: AttestationRecord): Promise<VaultItem> =>
-      save(record.attribute, (holder, options) => encryptAttestation(record, holder, options)),
-    [save],
+    async (record: AttestationRecord): Promise<VaultItem> => {
+      const item = await save(
+        record.attribute,
+        (holder, options) => encryptAttestation(record, holder, options),
+        { attestationId: record.attestationId },
+      )
+      void check(item.reference, record)
+      return item
+    },
+    [save, check],
   )
 
   const open = useCallback(
@@ -332,6 +359,82 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     },
     [request],
   )
+
+  const [arrived, setArrived] = useState(0)
+  const syncing = useRef(false)
+  const itemsRef = useRef(items)
+  itemsRef.current = items
+
+  /**
+   * Picks up the attestations organisations sent: decrypts each with this browser's key, keeps it
+   * only if it is addressed to this wallet, on this network, recorded on chain and not revoked,
+   * and deletes it from the inbox. An entry sealed for another of the holder's browsers stays.
+   */
+  const syncInbox = useCallback(async () => {
+    if (!address || syncing.current) return
+    syncing.current = true
+    try {
+      const holder = await keys()
+      const res = await fetch('/api/inbox', { cache: 'no-store' })
+      if (!res.ok) return
+      const entries = (await res.json()) as { id: string; item: string }[]
+      for (const entry of entries) {
+        const drop = () => fetch(`/api/inbox/${entry.id}`, { method: 'DELETE' })
+        let record: AttestationRecord
+        try {
+          const bytes = fromBase64(entry.item)
+          const packed = await verifyEncryptedItem(bytes, await fingerprintBytes(bytes))
+          const envelope = packed.envelopes.find((e) => e.recipientKeyId === holder.recipientKeyId)
+          if (!envelope) continue
+          const opened = await decryptAttestation(packed.record, envelope, holder, {
+            itemId: packed.record.itemId,
+            itemVersion: packed.record.itemVersion,
+            keyId: packed.record.keyId,
+            sourceClass: 'C',
+            grantId: envelope.grantId,
+            recordDigest: await fingerprintRecord(packed.record),
+          })
+          record = readAttestationFile(JSON.stringify(opened), {
+            holder: address,
+            chainId: appChain.id,
+            attestationRegistry,
+          })
+        } catch {
+          await drop() // unreadable or not for this wallet: nothing to keep
+          continue
+        }
+        const onChain = await anchorStatus(record)
+        if (onChain === 'unreadable') continue // try again on the next visit
+        if (onChain !== 'anchored') {
+          await drop()
+          continue
+        }
+        if (!itemsRef.current.some((i) => i.attestationId === record.attestationId)) {
+          await storeAttestation(record)
+          setArrived((n) => n + 1)
+        }
+        await drop()
+      }
+    } catch {
+      // Signed out, identity not verified yet, or offline: the entries wait for the next visit.
+    } finally {
+      syncing.current = false
+    }
+  }, [address, keys, storeAttestation])
+
+  // Once the vault is open (and the identity verified, which storing needs), collect what arrived
+  // and refresh the standing of attestations not checked in the last ten minutes.
+  useEffect(() => {
+    if (!ready || !address || identityStatus !== 'verified') return
+    void syncInbox()
+    for (const item of itemsRef.current) {
+      if (item.sourceClass !== 'C') continue
+      if (item.checkedAt && Date.now() - Date.parse(item.checkedAt) < 10 * 60_000) continue
+      void open(item)
+        .then((record) => check(item.reference, record as AttestationRecord))
+        .catch(() => undefined)
+    }
+  }, [ready, address, identityStatus, syncInbox, check, open])
 
   const share = useCallback(
     async (requestId: string, item: VaultItem): Promise<void> => {
@@ -397,6 +500,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         refuse,
         withdraw,
         ready,
+        arrived,
         signOut,
       }}
     >

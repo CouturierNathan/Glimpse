@@ -8,6 +8,8 @@ export default defineConfig({
     settings: { evmVersion: 'prague', optimizer: { enabled: true, runs: 200 } },
   },
   networks: {
+    // A local chain with Base Sepolia's id, so the web app can run against it unchanged (tests).
+    localBaseSepolia: { type: 'edr-simulated', chainType: 'op', chainId: 84532 },
     baseSepolia: {
       type: 'http',
       chainType: 'op',

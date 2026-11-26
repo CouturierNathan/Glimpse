@@ -7,9 +7,9 @@ import type {
 import { verify } from '@glimpse/verifier'
 import { type Address, createPublicClient, http } from 'viem'
 
-import { appChain, attestationRegistry } from './chains.ts'
+import { appChain, attestationRegistry, appRpc } from './chains.ts'
 
-const client = createPublicClient({ chain: appChain, transport: http() })
+const client = createPublicClient({ chain: appChain, transport: http(appRpc) })
 
 /** The requester's replay store: a request answered once in this tab is not accepted again. */
 const answered = new Set<string>()

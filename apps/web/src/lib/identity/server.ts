@@ -3,7 +3,7 @@ import { basename, resolve } from 'node:path'
 
 import { type Address, createPublicClient, type Hex, http, verifyMessage } from 'viem'
 
-import { appChain } from '@/lib/chains.ts'
+import { appChain, appRpc } from '@/lib/chains.ts'
 import { derivedKey } from '@/lib/state/server.ts'
 import { stateStore } from '@/lib/vault/server.ts'
 
@@ -110,7 +110,7 @@ export async function validateSignedPdf(pdf: Uint8Array) {
   return validatePades(pdf, { trustAnchors: await trustAnchors() })
 }
 
-const client = createPublicClient({ chain: appChain, transport: http() })
+const client = createPublicClient({ chain: appChain, transport: http(appRpc) })
 
 /** An EIP-191 signature by `address`: recovered locally, through the chain for contract wallets. */
 export async function signedBy(address: Address, message: string, signature: Hex) {

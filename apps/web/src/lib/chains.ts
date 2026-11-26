@@ -6,6 +6,12 @@ import { baseSepolia } from 'viem/chains'
  */
 export const appChain = baseSepolia
 
+/**
+ * The RPC the app reads and sends through. Unset, viem's public Base Sepolia endpoint. A local
+ * test chain with the same chain id (`npm run chain:local -w contracts`) can stand in for it.
+ */
+export const appRpc = process.env.NEXT_PUBLIC_RPC_URL || undefined
+
 /** AttestationRegistry the requester's verifier reads and the issuer portal anchors in. */
 export const attestationRegistry = (process.env.NEXT_PUBLIC_ATTESTATION_REGISTRY ??
   '0xE481E72D9aBe5B4a43405B2C58cAA972d0a6dDd6') as `0x${string}`

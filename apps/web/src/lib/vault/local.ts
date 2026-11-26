@@ -11,6 +11,11 @@ export interface VaultItem {
   /** Creation-time fingerprint of the stored bytes; downloads are checked against it. */
   digest: string
   expected: ItemExpectation
+  /** An organisation's attestation (class C): its id, to recognise it when it arrives again. */
+  attestationId?: string
+  /** Its standing on chain, checked in this browser by the verifier, and when. */
+  verdict?: 'authentic' | 'declared' | 'expired' | 'revoked' | 'undetermined'
+  checkedAt?: string
 }
 
 /**
