@@ -55,6 +55,12 @@ function literal(spec: AttributeSpec, quote: string): ClaimValue {
       return { type: 'string', value: token }
   }
 }
+/**
+ * Most attributes one run may ask for. It bounds what reaches the model in a single prompt; a
+ * document describing a person carries more than a handful of fields, so a request covering an
+ * identity, an address and a job fits without being split.
+ */
+export const MAX_SPECS = 16
 export function selectedExcerpts(document: ExtractionDocument, specs: AttributeSpec[]) {
   if (
     !document ||
@@ -65,7 +71,7 @@ export function selectedExcerpts(document: ExtractionDocument, specs: AttributeS
     document.pages.length > 12 ||
     !Array.isArray(specs) ||
     specs.length < 1 ||
-    specs.length > 8
+    specs.length > MAX_SPECS
   ) {
     throw new ExtractionError()
   }
