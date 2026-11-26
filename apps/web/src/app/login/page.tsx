@@ -1,9 +1,9 @@
-import type { Metadata } from 'next'
-
 import { SignInPanel } from '@/components/SignInPanel.tsx'
+import { T } from '@/components/I18nProvider.tsx'
+import { titled } from '@/lib/i18n/server.ts'
 import { safeNextPath } from '@/lib/nav.ts'
 
-export const metadata: Metadata = { title: 'Sign in · Glimpse' }
+export const generateMetadata = titled('title.signIn')
 
 export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
   const { next } = await searchParams
@@ -11,10 +11,11 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
   return (
     <section className="signin">
       <div>
-        <h1>Sign in with your wallet</h1>
+        <h1>
+          <T k="signIn.title" />
+        </h1>
         <p className="lede">
-          No password and no account to create. Your address is your identity, and your key never
-          leaves your wallet.
+          <T k="signIn.lede" />
         </p>
       </div>
       <SignInPanel next={safeNextPath(next)} />

@@ -11,29 +11,14 @@ export const statuses: readonly Status[] = [
   'undetermined',
 ]
 
-export const statusCopy: Record<Status, { label: string; meaning: string }> = {
-  authentic: {
-    label: 'Authentic',
-    meaning:
-      'An organisation signed it, and the chain confirms the signature, the content and that it is still valid.',
-  },
-  declared: {
-    label: 'Declared',
-    meaning: 'Read from a document you added. Nobody vouches for it on chain.',
-  },
-  expired: {
-    label: 'Expired',
-    meaning: 'Signed by an organisation, but past the end date it set.',
-  },
-  revoked: {
-    label: 'Revoked',
-    meaning: 'The organisation withdrew it. It no longer proves anything.',
-  },
-  undetermined: {
-    label: 'Undetermined',
-    meaning: 'Not checked against the chain yet, or the chain could not be read.',
-  },
-}
+/** The message keys of a status's label and meaning (see lib/i18n/messages.ts). */
+export const statusKeys = {
+  authentic: { label: 'status.authentic', meaning: 'status.authentic.meaning' },
+  declared: { label: 'status.declared', meaning: 'status.declared.meaning' },
+  expired: { label: 'status.expired', meaning: 'status.expired.meaning' },
+  revoked: { label: 'status.revoked', meaning: 'status.revoked.meaning' },
+  undetermined: { label: 'status.undetermined', meaning: 'status.undetermined.meaning' },
+} as const satisfies Record<Status, { label: string; meaning: string }>
 
 /**
  * The status of an item the holder keeps, before any requester checks it. Imported and

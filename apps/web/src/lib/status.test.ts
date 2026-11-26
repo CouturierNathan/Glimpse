@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { holderStatus, statusCopy, statuses } from './status.ts'
+import { messages } from './i18n/messages.ts'
+import { holderStatus, statuses, statusKeys } from './status.ts'
 
-test('every status has a label and a meaning', () => {
-  assert.deepEqual(Object.keys(statusCopy).sort(), [...statuses].sort())
-  for (const status of statuses) {
-    assert.ok(statusCopy[status].label.length > 0)
-    assert.ok(statusCopy[status].meaning.length > 0)
+test('every status has a label and a meaning in both languages', () => {
+  assert.deepEqual(Object.keys(statusKeys).sort(), [...statuses].sort())
+  for (const locale of [messages.en, messages.fr]) {
+    for (const status of statuses) {
+      assert.ok(locale[statusKeys[status].label].length > 0)
+      assert.ok(locale[statusKeys[status].meaning].length > 0)
+    }
   }
 })
 

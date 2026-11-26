@@ -6,10 +6,9 @@ import type { Hex } from 'viem'
 
 import { type Status } from '@/lib/status.ts'
 
+import { useI18n } from './I18nProvider.tsx'
 import { describeWalletError } from './SessionProvider.tsx'
 import { StatusBadge } from './StatusBadge.tsx'
-
-const date = (seconds: bigint) => new Date(Number(seconds) * 1000).toLocaleDateString('en-GB')
 
 /** What the index says, for listing only: a requester's verdict always comes from verify(). */
 function listedStatus(revokedAt: bigint, expiresAt: bigint): Status {
@@ -27,16 +26,22 @@ export function IssuedList({
   index: RegistryIndex
   onRevoke: (attestationId: Hex) => Promise<unknown>
 }) {
+  const { t, error: te, date: format } = useI18n()
+  const date = (seconds: bigint) => format(Number(seconds) * 1000, { dateStyle: 'medium' })
   const [busy, setBusy] = useState<Hex | null>(null)
   const [error, setError] = useState<string | null>(null)
   const issued = [...index.attestations].filter(([, a]) => a.issuerId === issuerId)
 
   if (issued.length === 0) {
-    return <p className="hint">Nothing issued yet.</p>
+    return (
+      <div className="card empty-inline">
+        <p className="hint">{t('issue.list.empty')}</p>
+      </div>
+    )
   }
 
   return (
-    <div className="vault">
+    <div className="vault card">
       <ul className="items">
         {issued.map(([id, a]) => {
           const status = listedStatus(a.revokedAt, a.expiresAt)
@@ -49,14 +54,14 @@ export function IssuedList({
                 </strong>
                 <span className="item-meta">
                   <StatusBadge status={status} />
-                  {date(a.issuedAt)} to {date(a.expiresAt)}
+                  {t('issue.list.dates', { from: date(a.issuedAt), to: date(a.expiresAt) })}
                 </span>
               </div>
               <div className="item-actions">
                 {status !== 'revoked' && (
                   <button
                     type="button"
-                    className="button quiet"
+                    className="button quiet small danger"
                     disabled={busy !== null}
                     onClick={async () => {
                       setBusy(id)
@@ -70,7 +75,7 @@ export function IssuedList({
                       }
                     }}
                   >
-                    {busy === id ? 'Confirm in your wallet…' : 'Revoke'}
+                    {busy === id ? t('issue.confirmWallet') : t('issue.list.revoke')}
                   </button>
                 )}
               </div>
@@ -80,12 +85,10 @@ export function IssuedList({
       </ul>
       {error && (
         <p role="alert" className="error">
-          {error}
+          {te(error)}
         </p>
       )}
-      <p className="hint">
-        The chain keeps only ids, dates and salted commitments: holders and values stay off it.
-      </p>
+      <p className="hint">{t('issue.list.hint')}</p>
     </div>
   )
 }

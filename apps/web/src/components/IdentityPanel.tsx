@@ -4,78 +4,77 @@ import type { IdentityValidationReport } from '@glimpse/shared'
 import { type FormEvent, useState } from 'react'
 import { signMessage } from 'wagmi/actions'
 
-import { BINDING_WARNING } from '@/lib/identity/warning.ts'
+import type { MessageKey } from '@/lib/i18n/messages.ts'
 import { wagmiConfig } from '@/lib/wagmi.ts'
 
 import { FilePicker } from './FilePicker.tsx'
+import { useI18n } from './I18nProvider.tsx'
+import { useIdentity } from './IdentityProvider.tsx'
 import { connectedAddress, describeWalletError } from './SessionProvider.tsx'
 import { useVault } from './VaultProvider.tsx'
 
 type Step =
   | { name: 'idle' }
   | { name: 'checking' }
-  | { name: 'report'; report: IdentityValidationReport; binding: string | null }
+  | { name: 'failed'; reason: MessageKey }
+  | { name: 'passed'; report: IdentityValidationReport; binding: string }
   | { name: 'signing'; report: IdentityValidationReport; binding: string }
-  | { name: 'bound'; report: IdentityValidationReport; address: string }
 
-const checkNames: Record<keyof IdentityValidationReport['checks'], string> = {
-  format: 'PDF signature found',
-  integrity: 'Document unchanged since signing',
-  signature: 'Signature matches the signer certificate',
-  chain: 'Signer certified by a trusted authority',
-  validity: 'Certificates valid today',
+/** Why a proof failed, in one sentence; the report's details stay on the server side. */
+function failureReason(report: IdentityValidationReport, nameFound: boolean): MessageKey {
+  if (report.indication === 'TOTAL_PASSED') {
+    return nameFound ? 'identity.reason.unknown' : 'identity.reason.noName'
+  }
+  return report.subIndication
+    ? (`identity.reason.${report.subIndication}` as MessageKey)
+    : 'identity.reason.unknown'
 }
-const outcomeText = { pass: 'Passed', fail: 'Failed', unknown: 'Not checked' } as const
 
-function Report({ report }: { report: IdentityValidationReport }) {
-  const passed = report.indication === 'TOTAL_PASSED'
+export function VerifiedBadge() {
+  const { t } = useI18n()
   return (
-    <>
-      <h2>{passed ? 'The signature is valid' : 'The signature could not be validated'}</h2>
-      <dl className="request-facts">
-        {Object.entries(checkNames).map(([check, label]) => (
-          <div key={check}>
-            <dt>{label}</dt>
-            <dd>{outcomeText[report.checks[check as keyof typeof checkNames]]}</dd>
-          </div>
-        ))}
-        {report.signer && (
-          <div>
-            <dt>Signed by</dt>
-            <dd>{report.signer.subject}</dd>
-          </div>
-        )}
-        {report.signingTime && (
-          <div>
-            <dt>Signed on</dt>
-            <dd>{new Date(report.signingTime).toLocaleString()}</dd>
-          </div>
-        )}
-      </dl>
-      {!passed && (
-        <p className="hint">
-          Result: {report.indication}
-          {report.subIndication ? ` (${report.subIndication})` : ''}.
-        </p>
-      )}
-    </>
+    <div className="card verified" role="status">
+      <span className="verified-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <path d="m6 12.5 4 4 8-9" />
+        </svg>
+      </span>
+      <div>
+        <strong>{t('identity.verified')}</strong>
+        <p className="hint">{t('identity.verifiedText')}</p>
+      </div>
+    </div>
   )
 }
 
 /**
- * Identity step of the import flow: checks a France Identité PDF's signature on the server, shows
- * the report, then has the wallet sign an explicit binding to it.
+ * The France Identité check: the server validates the PDF's signature and reads the name, then the
+ * wallet signs a binding to it. Once done, only a success state remains.
  */
 export function IdentityPanel() {
   const { request } = useVault()
+  const { status, refresh } = useIdentity()
+  const { t, error: te } = useI18n()
   const [step, setStep] = useState<Step>({ name: 'idle' })
   const [error, setError] = useState<string | null>(null)
+
+  if (status === 'verified') return <VerifiedBadge />
+  if (status === 'loading') {
+    return (
+      <div className="card" aria-busy="true">
+        <p className="hint loading-line">
+          <span className="spinner" aria-hidden="true" />
+          {t('identity.checking')}
+        </p>
+      </div>
+    )
+  }
 
   async function onCheck(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const chosen = new FormData(event.currentTarget).get('file')
     if (!(chosen instanceof File) || chosen.size === 0) {
-      setError('Choose a proof first.')
+      setError(t('identity.chooseFirst'))
       return
     }
     const form = new FormData()
@@ -87,10 +86,15 @@ export function IdentityPanel() {
       const body = (await res.json()) as {
         report: IdentityValidationReport
         binding: string | null
+        nameFound?: boolean
       }
-      setStep({ name: 'report', ...body })
+      setStep(
+        body.binding
+          ? { name: 'passed', report: body.report, binding: body.binding }
+          : { name: 'failed', reason: failureReason(body.report, Boolean(body.nameFound)) },
+      )
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'The check failed, try again.')
+      setError(err instanceof Error ? err.message : t('identity.reason.unknown'))
       setStep({ name: 'idle' })
     }
   }
@@ -101,98 +105,101 @@ export function IdentityPanel() {
     try {
       await connectedAddress()
       const signature = await signMessage(wagmiConfig, { message: binding })
-      const res = await request('/api/identity/bind', {
+      await request('/api/identity/bind', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reportId: report.reportId, signature }),
       })
-      const { address } = (await res.json()) as { address: string }
-      setStep({ name: 'bound', report, address })
+      await refresh()
     } catch (err) {
       setError(describeWalletError(err))
-      setStep({ name: 'report', report, binding })
+      setStep({ name: 'passed', report, binding })
     }
   }
 
-  if (step.name === 'idle' || step.name === 'checking') {
+  const alert = error && (
+    <p role="alert" className="error">
+      {te(error)}
+    </p>
+  )
+
+  const progress = (
+    <ol className="progress" aria-label={t('import.identityTitle')}>
+      <li data-state={step.name === 'passed' || step.name === 'signing' ? 'done' : 'current'}>
+        {t('identity.step1')}
+      </li>
+      <li data-state={step.name === 'passed' || step.name === 'signing' ? 'current' : undefined}>
+        {t('identity.step2')}
+      </li>
+    </ol>
+  )
+
+  if (step.name === 'failed') {
     return (
-      <form className="panel form" onSubmit={onCheck}>
-        <div className="samples">
-          <h3>Two proofs to try</h3>
-          <ul>
-            <li>
-              <a href="/demo/FAKE-identity-proof.pdf" download>
-                Valid proof — passes
-              </a>
-            </li>
-            <li>
-              <a href="/demo/FAKE-identity-proof-wrong-signer.pdf" download>
-                Forged proof — fails the chain
-              </a>
-            </li>
-          </ul>
-          <p className="hint">
-            Both are test files signed by a FAKE test authority, not real documents. The second one
-            is signed by a look-alike signer no trusted authority certifies: the report shows it.
-          </p>
+      <div className="card result failed" role="alert">
+        <h3>{t('identity.failed')}</h3>
+        <p>{t(step.reason)}</p>
+        <div className="actions">
+          <button type="button" className="button quiet" onClick={() => setStep({ name: 'idle' })}>
+            {t('identity.retry')}
+          </button>
         </div>
-        <FilePicker
-          name="file"
-          accept=".pdf,application/pdf"
-          label="France Identité proof"
-          buttonLabel="Choose a proof"
-          hint="The signed PDF from the France Identité app. Glimpse checks its signature on the server and does not store it or send it to the extractor."
-        />
-        <button type="submit" className="button" disabled={step.name === 'checking'}>
-          {step.name === 'checking' ? 'Checking the signature…' : 'Check the signature'}
-        </button>
-        {error && (
-          <p role="alert" className="error">
-            {error}
-          </p>
-        )}
-      </form>
+      </div>
+    )
+  }
+
+  if (step.name === 'passed' || step.name === 'signing') {
+    return (
+      <div className="card result" role="status">
+        {progress}
+        <h3>{t('identity.passed')}</h3>
+        <p className="hint">{t('identity.passedText')}</p>
+        <details className="disclosure">
+          <summary>{t('identity.bindWarning')}</summary>
+          <p className="hint">{t('identity.warning')}</p>
+        </details>
+        <div className="actions">
+          <button
+            type="button"
+            className="button"
+            disabled={step.name === 'signing'}
+            onClick={() => onBind(step.report, step.binding)}
+          >
+            {step.name === 'signing' && <span className="spinner" aria-hidden="true" />}
+            {step.name === 'signing' ? t('identity.signBusy') : t('identity.sign')}
+          </button>
+          {step.name !== 'signing' && (
+            <button
+              type="button"
+              className="button quiet"
+              onClick={() => setStep({ name: 'idle' })}
+            >
+              {t('common.cancel')}
+            </button>
+          )}
+        </div>
+        {alert}
+      </div>
     )
   }
 
   return (
-    <div className="panel import-result" role="status">
-      <Report report={step.report} />
-      {step.name === 'bound' ? (
-        <p>
-          Bound to your wallet <span className="address">{step.address}</span>.
-        </p>
-      ) : (
-        step.binding && (
-          <>
-            <p className="hint">
-              <strong>Before you sign:</strong> {BINDING_WARNING}
-            </p>
-            <div className="actions">
-              <button
-                type="button"
-                className="button"
-                disabled={step.name === 'signing'}
-                onClick={() => step.binding && onBind(step.report, step.binding)}
-              >
-                {step.name === 'signing' ? 'Waiting for your wallet…' : 'Sign the binding'}
-              </button>
-            </div>
-          </>
-        )
-      )}
-      {step.name !== 'signing' && (
-        <div className="actions">
-          <button type="button" className="button quiet" onClick={() => setStep({ name: 'idle' })}>
-            Check another document
-          </button>
-        </div>
-      )}
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      )}
-    </div>
+    <form className="card form" onSubmit={onCheck}>
+      {progress}
+      <FilePicker
+        name="file"
+        accept=".pdf,application/pdf"
+        label={t('identity.file')}
+        buttonLabel={t('identity.fileButton')}
+        hint={t('identity.fileHint')}
+      />
+      <div className="actions">
+        <button type="submit" className="button" disabled={step.name === 'checking'}>
+          {step.name === 'checking' && <span className="spinner" aria-hidden="true" />}
+          {step.name === 'checking' ? t('identity.submitBusy') : t('identity.submit')}
+        </button>
+      </div>
+      {alert}
+    </form>
   )
 }

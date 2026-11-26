@@ -33,13 +33,18 @@ export function verifyShared(
   })
 }
 
-export const checkNames: Record<keyof VerificationResult['checks'], string> = {
-  signature: 'Issuer signature',
-  provenance: 'Issuer and attribute',
-  integrity: 'Content unchanged',
-  validity: 'Within its dates',
-  revocation: 'Not revoked',
-  replay: 'Request answered once',
-}
+/** The message key of each check the verifier runs, in the order the result lists them. */
+export const checkNames = {
+  signature: 'check.signature',
+  provenance: 'check.provenance',
+  integrity: 'check.integrity',
+  validity: 'check.validity',
+  revocation: 'check.revocation',
+  replay: 'check.replay',
+} as const satisfies Record<keyof VerificationResult['checks'], string>
 
-export const outcomeNames = { pass: 'Passed', fail: 'Failed', unknown: 'Not checked' } as const
+export const outcomeNames = {
+  pass: 'outcome.pass',
+  fail: 'outcome.fail',
+  unknown: 'outcome.unknown',
+} as const

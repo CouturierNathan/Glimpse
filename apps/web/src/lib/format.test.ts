@@ -10,6 +10,7 @@ test('shortAddress keeps the prefix and the last four characters', () => {
 test('formatClaimValue reads booleans as yes or no', () => {
   assert.equal(formatClaimValue({ type: 'boolean', value: true }), 'Yes')
   assert.equal(formatClaimValue({ type: 'boolean', value: false }), 'No')
+  assert.equal(formatClaimValue({ type: 'boolean', value: true }, 'fr'), 'Oui')
 })
 
 test('formatClaimValue keeps numbers, dates and strings readable', () => {

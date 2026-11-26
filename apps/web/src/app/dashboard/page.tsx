@@ -1,62 +1,72 @@
-import type { Metadata } from 'next'
 import { AttestationImport } from '@/components/AttestationImport.tsx'
+import { T } from '@/components/I18nProvider.tsx'
+import { PageHead } from '@/components/PageHead.tsx'
 import { StatusLegend } from '@/components/StatusBadge.tsx'
 import { VaultList } from '@/components/VaultList.tsx'
+import { titled } from '@/lib/i18n/server.ts'
 import { storageMode } from '@/lib/vault/server.ts'
 
-export const metadata: Metadata = { title: 'Vault · Glimpse' }
+export const generateMetadata = titled('title.vault')
+
+const sources = [
+  { mark: 'mark', title: 'source.A', text: 'source.A.text' },
+  { mark: 'mark signed', title: 'source.B', text: 'source.B.text' },
+  { mark: 'mark attested', title: 'source.C.title', text: 'source.C.text' },
+] as const
 
 export default async function DashboardPage() {
   const mode = await storageMode()
 
   return (
     <section>
-      <header className="page-head">
-        <h1>Vault</h1>
-        <p className="who">You, the holder</p>
-        <p className="lede">
-          Your attributes, each marked with where it comes from. Only you can open them.
-        </p>
-      </header>
+      <PageHead title="title.vault" who="who.holder" lede="vault.lede" />
 
       {mode === 'memory' && (
-        <p className="notice">
-          This server keeps the encrypted items in its own memory, not on a disk. Everything below
-          works, and nothing is less private — the ciphertext simply does not outlive the server.
-          Restart it and the items are gone.
-        </p>
+        <aside className="notice" role="note">
+          <svg viewBox="0 0 20 20" aria-hidden="true" className="notice-icon">
+            <circle cx="10" cy="10" r="8" />
+            <path d="M10 9v5M10 6.2v.1" />
+          </svg>
+          <p>
+            <strong>
+              <T k="vault.storage.title" />
+            </strong>{' '}
+            <T k="vault.storage.text" />
+          </p>
+        </aside>
       )}
 
       <VaultList />
       <AttestationImport />
 
-      <h2 className="section-title">What each status means</h2>
-      <StatusLegend />
-
-      <h2 className="section-title">Where your attributes come from</h2>
-      <ul className="sources">
-        <li>
-          <span className="mark" aria-hidden="true" />
-          <div>
-            <h3>Imported</h3>
-            <p>Read from a document you added. Useful to you, but nobody vouches for it yet.</p>
-          </div>
-        </li>
-        <li>
-          <span className="mark signed" aria-hidden="true" />
-          <div>
-            <h3>Signature verified</h3>
-            <p>The document carries a digital signature, and Glimpse checked it.</p>
-          </div>
-        </li>
-        <li>
-          <span className="mark attested" aria-hidden="true" />
-          <div>
-            <h3>Attested by an organisation</h3>
-            <p>An organisation signed this attribute and anchored it on chain.</p>
-          </div>
-        </li>
-      </ul>
+      <div className="reference">
+        <div>
+          <h2 className="section-title">
+            <T k="vault.statusTitle" />
+          </h2>
+          <StatusLegend />
+        </div>
+        <div>
+          <h2 className="section-title">
+            <T k="vault.sourcesTitle" />
+          </h2>
+          <ul className="sources">
+            {sources.map((source) => (
+              <li key={source.title}>
+                <span className={source.mark} aria-hidden="true" />
+                <div>
+                  <h3>
+                    <T k={source.title} />
+                  </h3>
+                  <p>
+                    <T k={source.text} />
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     </section>
   )
 }

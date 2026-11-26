@@ -34,6 +34,7 @@ import {
   useState,
 } from 'react'
 
+import { useIdentity } from './IdentityProvider.tsx'
 import { useSession } from './SessionProvider.tsx'
 
 /** What the browser keeps about a stored item. The server only ever sees its ciphertext. */
@@ -163,6 +164,7 @@ async function createIdentity(): Promise<EncryptionIdentity> {
  */
 export function VaultProvider({ children }: { children: ReactNode }) {
   const { address, signOut } = useSession()
+  const { refresh: refreshIdentity } = useIdentity()
   const [items, setItems] = useState<VaultItem[]>([])
   const identity = useRef<Promise<EncryptionIdentity> | null>(null)
 
@@ -194,9 +196,11 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       // The server session is gone: drop the client one too, so the sign-in page asks again
       // instead of sending the user straight back here.
       if (error.code === 'SIGNED_OUT') await signOut()
+      // The server forgot the identity (a restart): lock the screens that need it again.
+      if (error.code === 'IDENTITY_REQUIRED') await refreshIdentity()
       throw error
     },
-    [keys, signOut],
+    [keys, signOut, refreshIdentity],
   )
 
   const save = useCallback(

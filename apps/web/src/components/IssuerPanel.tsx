@@ -2,6 +2,7 @@
 
 import type { AttestationRecord } from '@glimpse/shared'
 import { indexRegistries, randomBytes, type RegistryIndex } from '@glimpse/verifier'
+import Link from 'next/link'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { createPublicClient, type Hash, type Hex, http, isAddressEqual } from 'viem'
 import { signTypedData, switchChain, waitForTransactionReceipt, writeContract } from 'wagmi/actions'
@@ -26,6 +27,9 @@ import {
 import { importAttributes } from '@/lib/vault/attributes.ts'
 import { wagmiConfig } from '@/lib/wagmi.ts'
 
+import { LockIcon } from './AttestationImport.tsx'
+import { useI18n } from './I18nProvider.tsx'
+import { useIdentity } from './IdentityProvider.tsx'
 import { IssuedList } from './IssuedList.tsx'
 import { connectedAddress, describeWalletError, useSession } from './SessionProvider.tsx'
 
@@ -55,8 +59,32 @@ async function send(sent: Promise<Hash>): Promise<Hash> {
   return hash
 }
 
+/** Issuing is open to a wallet whose identity is verified, like importing. */
 export function IssuerPanel() {
+  const { status } = useIdentity()
+  const { t } = useI18n()
+
+  if (status !== 'verified') {
+    return (
+      <div className="card locked-card">
+        <p className="locked">
+          <LockIcon />
+          {status === 'loading' ? t('identity.checking') : t('issue.locked.text')}
+        </p>
+        {status === 'unverified' && (
+          <Link href="/import" className="button quiet small">
+            {t('identity.required.cta')}
+          </Link>
+        )}
+      </div>
+    )
+  }
+  return <Issuer />
+}
+
+function Issuer() {
   const { address } = useSession()
+  const { t, attr, error: te } = useI18n()
   const [index, setIndex] = useState<RegistryIndex | null>(null)
   const [indexError, setIndexError] = useState(false)
   const [busy, setBusy] = useState<Busy>(null)
@@ -169,18 +197,23 @@ export function IssuerPanel() {
 
   if (index === null) {
     return (
-      <div className="panel" aria-live="polite">
+      <div className="card" aria-live="polite">
         {indexError ? (
           <>
             <p role="alert" className="error">
-              The registries could not be read from the chain.
+              {t('issue.readFailed')}
             </p>
-            <button type="button" className="button quiet" onClick={() => void refresh()}>
-              Try again
-            </button>
+            <div className="actions">
+              <button type="button" className="button quiet" onClick={() => void refresh()}>
+                {t('common.tryAgain')}
+              </button>
+            </div>
           </>
         ) : (
-          <p className="hint">Reading the registries from the chain…</p>
+          <p className="hint loading-line">
+            <span className="spinner" aria-hidden="true" />
+            {t('issue.reading')}
+          </p>
         )}
       </div>
     )
@@ -188,25 +221,31 @@ export function IssuerPanel() {
 
   const alert = error && (
     <p role="alert" className="error">
-      {error}
+      {te(error)}
     </p>
   )
 
   if (!issuerId || !issuer) {
     return (
-      <form className="panel form" onSubmit={onRegister}>
-        <h2>Register your organisation</h2>
-        <p className="hint">
-          Registration is open and public. Your wallet becomes the organisation&apos;s admin and
-          signer. Requesters decide for themselves which organisations they trust.
-        </p>
+      <form className="card form" onSubmit={onRegister}>
+        <h3>{t('issue.register.title')}</h3>
+        <p className="hint">{t('issue.register.hint')}</p>
         <div className="field">
-          <label htmlFor="name">Organisation name</label>
-          <input id="name" name="name" required maxLength={80} placeholder="Epitech Paris" />
+          <label htmlFor="name">{t('issue.register.name')}</label>
+          <input
+            id="name"
+            name="name"
+            required
+            maxLength={80}
+            placeholder={t('issue.register.placeholder')}
+          />
         </div>
-        <button type="submit" className="button" disabled={busy !== null}>
-          {busy === 'register' ? 'Confirm in your wallet…' : 'Register on chain'}
-        </button>
+        <div className="actions">
+          <button type="submit" className="button" disabled={busy !== null}>
+            {busy === 'register' && <span className="spinner" aria-hidden="true" />}
+            {busy === 'register' ? t('issue.confirmWallet') : t('issue.register.submit')}
+          </button>
+        </div>
         {alert}
       </form>
     )
@@ -218,23 +257,25 @@ export function IssuerPanel() {
 
   return (
     <>
-      <p className="hint">
-        Issuing as <strong>{issuerName(issuer.metadataURI)}</strong>
+      <p className="issuer-as">
+        {t('issue.as')} <strong>{issuerName(issuer.metadataURI)}</strong>
       </p>
       {issued ? (
-        <div className="panel request-status">
-          <h2>Attestation anchored</h2>
-          <p className="hint">
-            Send this file to the holder. It holds the value and its salt: only they should get it.
-            The chain only keeps a salted commitment.
+        <div className="card request-status">
+          <p className="success-line">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m3.5 8.5 3 3 6-7" />
+            </svg>
+            {t('issue.done.title')}
           </p>
+          <p className="hint">{t('issue.done.hint')}</p>
           <div className="actions">
             <a
               className="button"
               href={file ?? undefined}
               download={`attestation-${issued.record.attestationId}.json`}
             >
-              Download the attestation
+              {t('issue.done.download')}
             </a>
             <a
               className="button quiet"
@@ -242,18 +283,18 @@ export function IssuerPanel() {
               target="_blank"
               rel="noreferrer"
             >
-              See the transaction
+              {t('issue.done.tx')}
             </a>
             <button type="button" className="button quiet" onClick={() => setIssued(null)}>
-              Issue another
+              {t('issue.done.another')}
             </button>
           </div>
         </div>
       ) : (
-        <form className="panel form" onSubmit={onIssue}>
-          <h2>Issue an attestation</h2>
+        <form className="card form" onSubmit={onIssue}>
+          <h3>{t('issue.form.title')}</h3>
           <div className="field">
-            <label htmlFor="holder">Holder&apos;s wallet address</label>
+            <label htmlFor="holder">{t('issue.form.holder')}</label>
             <input
               id="holder"
               name="holder"
@@ -263,7 +304,7 @@ export function IssuerPanel() {
             />
           </div>
           <div className="field">
-            <label htmlFor="attribute">Attribute</label>
+            <label htmlFor="attribute">{t('issue.form.attribute')}</label>
             <select
               id="attribute"
               name="attribute"
@@ -272,17 +313,17 @@ export function IssuerPanel() {
             >
               {importAttributes.map((a) => (
                 <option key={a.attribute} value={a.attribute}>
-                  {a.name}
+                  {attr(a.attribute)}
                 </option>
               ))}
             </select>
           </div>
           <div className="field">
-            <label htmlFor="value">Value</label>
+            <label htmlFor="value">{t('issue.form.value')}</label>
             {type === 'boolean' ? (
               <select id="value" name="value" defaultValue="true">
-                <option value="true">Yes</option>
-                <option value="false">No</option>
+                <option value="true">{t('common.yes')}</option>
+                <option value="false">{t('common.no')}</option>
               </select>
             ) : (
               <input
@@ -295,7 +336,7 @@ export function IssuerPanel() {
             )}
           </div>
           <div className="field">
-            <label htmlFor="validDays">Valid for (days)</label>
+            <label htmlFor="validDays">{t('issue.form.validDays')}</label>
             <input
               id="validDays"
               name="validDays"
@@ -306,13 +347,16 @@ export function IssuerPanel() {
               defaultValue={DEFAULT_VALID_DAYS}
             />
           </div>
-          <button type="submit" className="button" disabled={busy !== null}>
-            {busy === 'issue' ? 'Sign, then confirm in your wallet…' : 'Sign and anchor'}
-          </button>
+          <div className="actions">
+            <button type="submit" className="button" disabled={busy !== null}>
+              {busy === 'issue' && <span className="spinner" aria-hidden="true" />}
+              {busy === 'issue' ? t('issue.form.busy') : t('issue.form.submit')}
+            </button>
+          </div>
           {alert}
         </form>
       )}
-      <h2 className="section-title">Issued by your organisation</h2>
+      <h2 className="section-title">{t('issue.list.title')}</h2>
       <IssuedList
         issuerId={issuerId}
         index={index}

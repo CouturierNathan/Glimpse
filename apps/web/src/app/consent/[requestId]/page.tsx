@@ -1,9 +1,10 @@
-import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
+import { PageHead } from '@/components/PageHead.tsx'
 import { RequestReview } from '@/components/RequestReview.tsx'
+import { titled } from '@/lib/i18n/server.ts'
 
-export const metadata: Metadata = { title: 'Request · Glimpse' }
+export const generateMetadata = titled('title.request')
 
 export default async function RequestPage({ params }: PageProps<'/consent/[requestId]'>) {
   const { requestId } = await params
@@ -11,13 +12,7 @@ export default async function RequestPage({ params }: PageProps<'/consent/[reque
 
   return (
     <section>
-      <header className="page-head">
-        <h1>A request for one attribute</h1>
-        <p className="lede">
-          Read who asks and why. You share one value, or nothing: the rest of your vault stays
-          closed.
-        </p>
-      </header>
+      <PageHead title="request.title" who="who.holder" lede="request.lede" />
       <RequestReview requestId={requestId} />
     </section>
   )

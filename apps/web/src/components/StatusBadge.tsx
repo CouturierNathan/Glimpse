@@ -1,4 +1,8 @@
-import { type Status, statusCopy, statuses } from '@/lib/status.ts'
+'use client'
+
+import { type Status, statuses, statusKeys } from '@/lib/status.ts'
+
+import { useI18n } from './I18nProvider.tsx'
 
 /** Each status has its own shape, so it never relies on colour alone. */
 function Glyph({ status }: { status: Status }) {
@@ -22,19 +26,20 @@ function Glyph({ status }: { status: Status }) {
 }
 
 export function StatusBadge({ status }: { status: Status }) {
-  const { label, meaning } = statusCopy[status]
+  const { t } = useI18n()
   return (
-    <span className="status" data-status={status} title={meaning}>
+    <span className="status" data-status={status} title={t(statusKeys[status].meaning)}>
       <svg viewBox="0 0 16 16" aria-hidden="true">
         <Glyph status={status} />
       </svg>
-      {label}
+      {t(statusKeys[status].label)}
     </span>
   )
 }
 
 /** What each status means, with the badge the holder sees on items. */
 export function StatusLegend() {
+  const { t } = useI18n()
   return (
     <dl className="legend">
       {statuses.map((status) => (
@@ -42,7 +47,7 @@ export function StatusLegend() {
           <dt>
             <StatusBadge status={status} />
           </dt>
-          <dd>{statusCopy[status].meaning}</dd>
+          <dd>{t(statusKeys[status].meaning)}</dd>
         </div>
       ))}
     </dl>

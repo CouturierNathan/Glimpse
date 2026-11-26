@@ -138,14 +138,15 @@ export const importAttributes: readonly ImportAttribute[] = [
 /** The extraction service reads at most this many attributes in one run. */
 export const MAX_ATTRIBUTES_PER_IMPORT = 16
 
-/** Identity documents are refused by the extraction service: they never reach the model. */
-export const documentKinds = [
-  { kind: 'synthetic', name: 'Synthetic demo document' },
-  { kind: 'education', name: 'Education certificate' },
-  { kind: 'employment', name: 'Employment certificate' },
-] as const
+/**
+ * The kind every import declares. The holder no longer picks one: the extractor reads the same
+ * labels whatever the document, and identity documents never go through it (they go through the
+ * France Identité check), so this is never `identity`.
+ */
+export const IMPORT_DOCUMENT_KIND = 'synthetic' satisfies DocumentUploadRequest['kind']
 
-export type DocumentKind = (typeof documentKinds)[number]['kind']
+/** Always read, so the server can match the document's name with the verified identity. */
+export const NAME_ATTRIBUTE = 'full_name'
 
 export function attributeName(attribute: string): string {
   return importAttributes.find((a) => a.attribute === attribute)?.name ?? attribute
