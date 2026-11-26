@@ -462,6 +462,11 @@ export function ImportPanel() {
           </fieldset>
 
           <div className="field">
+            {/*
+             * A permission, so it reads as one: what is being allowed on the line with the box,
+             * and what that means underneath. One block of justified prose beside a tick made
+             * the holder read a paragraph to find out what they were agreeing to.
+             */}
             <label className="check consent" data-invalid={fields.errors.consent ? '' : undefined}>
               <input
                 type="checkbox"
@@ -469,7 +474,10 @@ export function ImportPanel() {
                 {...fields.control('consent')}
                 onChange={() => fields.clear('consent')}
               />
-              <span>{t('import.consent')}</span>
+              <span className="consent-text">
+                <strong>{t('import.consent.title')}</strong>
+                <span>{t('import.consent')}</span>
+              </span>
             </label>
             <FieldError name="consent" message={fields.errors.consent} />
           </div>

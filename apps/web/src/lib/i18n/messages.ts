@@ -230,8 +230,9 @@ const en = {
   'import.selectAll': 'Tick everything',
   'import.selectNone': 'Untick everything',
   'import.nameRequired': 'Always read, to check the document is in your name.',
+  'import.consent.title': 'I allow Glimpse to read this document',
   'import.consent':
-    'Glimpse may read this document on its server to extract the information above. The text is not kept, and each value is encrypted in this browser before it is saved.',
+    'The reading happens on the server, long enough to extract the information you ticked. The text is not kept, and each value is encrypted in this browser before it is saved.',
   'import.submit': 'Read the document',
   'import.reading': 'Reading the document…',
   'import.encrypting': 'Encrypting in your browser…',
@@ -367,6 +368,10 @@ const en = {
   'issue.done.title': 'Attestation recorded',
   'issue.done.hint':
     'Send this file to the holder. It holds the value and its salt: only they should get it. The chain only keeps a salted commitment.',
+  'issue.done.step1': 'Download the file below.',
+  'issue.done.step2': 'Send it to the holder, however you like.',
+  'issue.done.step3':
+    'They add it from their Import screen, and it appears in their vault. Until they have the file their vault stays empty — the chain holds the salted commitment, never the value.',
   'issue.done.download': 'Download the attestation',
   'issue.done.tx': 'See the transaction',
   'issue.done.another': 'Issue another',
@@ -698,8 +703,9 @@ const fr: Messages = {
   'import.selectAll': 'Tout cocher',
   'import.selectNone': 'Tout décocher',
   'import.nameRequired': 'Toujours lu, pour vérifier que le document est à votre nom.',
+  'import.consent.title': 'J’autorise Glimpse à lire ce document',
   'import.consent':
-    'Glimpse peut lire ce document sur son serveur pour en extraire les informations ci-dessus. Le texte n’est pas conservé, et chaque valeur est chiffrée dans ce navigateur avant d’être enregistrée.',
+    'La lecture a lieu sur le serveur, le temps d’en extraire les informations cochées. Le texte n’est pas conservé, et chaque valeur est chiffrée dans ce navigateur avant d’être enregistrée.',
   'import.submit': 'Lire le document',
   'import.reading': 'Lecture du document…',
   'import.encrypting': 'Chiffrement dans votre navigateur…',
@@ -833,6 +839,10 @@ const fr: Messages = {
   'issue.done.title': 'Attestation inscrite',
   'issue.done.hint':
     'Envoyez ce fichier au titulaire. Il contient la valeur et son sel : lui seul doit le recevoir. La blockchain ne garde qu’un engagement salé.',
+  'issue.done.step1': 'Téléchargez le fichier ci-dessous.',
+  'issue.done.step2': 'Transmettez-le au titulaire, par le canal de votre choix.',
+  'issue.done.step3':
+    'Il l’ajoute depuis son écran Import : l’attestation apparaît alors dans son coffre. Tant qu’il n’a pas le fichier, son coffre reste vide — la blockchain ne contient que l’engagement salé, jamais la valeur.',
   'issue.done.download': 'Télécharger l’attestation',
   'issue.done.tx': 'Voir la transaction',
   'issue.done.another': 'En émettre une autre',

@@ -376,6 +376,16 @@ function Issuer() {
           <Notice tone="success" title={t('issue.done.title')}>
             {t('issue.done.hint')}
           </Notice>
+          {/*
+           * The chain holds a salted commitment, never the value, so anchoring alone leaves the
+           * holder with nothing to see. Saying it as the next step, rather than as a note under
+           * the confirmation, is what stops an issuer waiting for a vault that will stay empty.
+           */}
+          <ol className="handover">
+            <li>{t('issue.done.step1')}</li>
+            <li>{t('issue.done.step2')}</li>
+            <li>{t('issue.done.step3')}</li>
+          </ol>
           <div className="actions">
             <a
               className="button"

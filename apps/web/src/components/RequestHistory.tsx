@@ -142,10 +142,12 @@ export function RequestHistory() {
   }
 
   return (
-    <div className="stack">
+    // Not `.stack`: that is a narrow column with its own heading rhythm, and this sits at page
+    // width beside the legend below it.
+    <div className="history-groups">
       {received.length > 0 && (
         <section>
-          <h3 className="section-title">{t('history.received')}</h3>
+          <h3 className="history-title">{t('history.received')}</h3>
           <ul className="history">
             {received.map((entry) => (
               <Row
@@ -166,7 +168,7 @@ export function RequestHistory() {
 
       {sent.length > 0 && (
         <section>
-          <h3 className="section-title">{t('history.sent')}</h3>
+          <h3 className="history-title">{t('history.sent')}</h3>
           <ul className="history">
             {sent.map((entry) => (
               <Row
