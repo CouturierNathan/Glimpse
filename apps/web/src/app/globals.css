@@ -1078,7 +1078,15 @@ a {
  * on purpose: without it the two tie and the bold wins by source order.
  */
 .field > label.consent {
+  /* `.field > label` resets a field title's padding to 0; the consent box keeps its own. */
+  padding: 1.125rem 1.25rem;
   font-weight: 400;
+}
+
+@media (max-width: 36rem) {
+  .field > label.consent {
+    padding: 1rem;
+  }
 }
 
 .consent input {
