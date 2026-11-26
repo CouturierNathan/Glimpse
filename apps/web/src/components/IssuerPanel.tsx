@@ -45,6 +45,7 @@ import { describeWalletError, walletAccount, WalletError, walletMessages } from 
 import { LockIcon } from './Icons.tsx'
 import { ErrorNotice, FieldError, Notice, useFieldErrors } from './Form.tsx'
 import { useI18n } from './I18nProvider.tsx'
+import { Select } from './Select.tsx'
 import { useIdentity } from './IdentityProvider.tsx'
 import { IssuedList } from './IssuedList.tsx'
 import { useSession } from './SessionProvider.tsx'
@@ -413,7 +414,7 @@ function Issuer() {
           </div>
           <div className="field">
             <label htmlFor="attribute">{t('issue.form.attribute')}</label>
-            <select
+            <Select
               id="attribute"
               name="attribute"
               value={attribute}
@@ -421,21 +422,24 @@ function Issuer() {
                 setAttribute(e.target.value)
                 fields.clear('value')
               }}
-            >
-              {importAttributes.map((a) => (
-                <option key={a.attribute} value={a.attribute}>
-                  {attr(a.attribute)}
-                </option>
-              ))}
-            </select>
+              options={importAttributes.map((a) => ({
+                value: a.attribute,
+                label: attr(a.attribute),
+              }))}
+            />
           </div>
           <div className="field">
             <label htmlFor="value">{t('issue.form.value')}</label>
             {type === 'boolean' ? (
-              <select id="value" name="value" defaultValue="true">
-                <option value="true">{t('common.yes')}</option>
-                <option value="false">{t('common.no')}</option>
-              </select>
+              <Select
+                id="value"
+                name="value"
+                defaultValue="true"
+                options={[
+                  { value: 'true', label: t('common.yes') },
+                  { value: 'false', label: t('common.no') },
+                ]}
+              />
             ) : (
               <input
                 id="value"

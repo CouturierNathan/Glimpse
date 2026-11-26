@@ -877,6 +877,52 @@ a {
   cursor: not-allowed;
 }
 
+/*
+ * The app's dropdown. The control stays a native select — every browser, screen reader and phone
+ * already knows it — and only its frame changes: the system arrow is replaced by one in the app's
+ * ink, so it sits with the inputs around it instead of looking like a widget borrowed from the OS.
+ */
+.select {
+  position: relative;
+  display: block;
+}
+
+.select select {
+  width: 100%;
+  padding-right: 2.5rem;
+  appearance: none;
+  cursor: pointer;
+}
+
+.select-arrow {
+  position: absolute;
+  top: 50%;
+  right: 0.85rem;
+  width: 1rem;
+  height: 1rem;
+  margin-top: -0.5rem;
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transition: stroke 120ms ease;
+}
+
+.select:hover .select-arrow {
+  stroke: var(--ink);
+}
+
+.select select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.select:has(select:disabled) .select-arrow {
+  opacity: 0.6;
+}
+
 .form :is(input, select, textarea):hover:not(:disabled, :read-only) {
   border-color: var(--ink-soft);
 }
@@ -1010,13 +1056,115 @@ a {
   font-size: 0.8rem;
 }
 
+/* The permission the holder gives before a document is read: it has to be comfortable to read. */
 .consent {
-  padding: 1rem;
+  align-items: flex-start;
+  gap: 0.875rem;
+  min-height: 0;
+  padding: 1.125rem 1.25rem;
   border: 1px solid var(--rule);
+  border-left: 3px solid var(--tint);
   border-radius: var(--radius-control);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 0.925rem;
+  line-height: 1.65;
+}
+
+.consent input {
+  margin-top: 0.2rem;
+}
+
+.consent:hover {
+  border-color: var(--ink-soft);
+  border-left-color: var(--tint);
+}
+
+/* Tick-everything sits with the hint it applies to, not on top of the grid. */
+.select-all {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.select-all .hint {
+  flex: 1 1 18rem;
+  margin: 0;
+}
+
+/* Where a piece of information comes from, next to what a requester could conclude from it. */
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.1rem 0.55rem;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
   background: var(--paper);
   color: var(--ink-soft);
-  font-size: 0.925rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.source-badge::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--mask);
+}
+
+.source-badge[data-source='C'] {
+  border-color: var(--tint);
+  background: var(--tint-wash);
+  color: var(--tint-ink, var(--ink));
+}
+
+.source-badge[data-source='C']::before {
+  background: var(--tint);
+}
+
+/* The holder's record of what was asked and shared, in the shape of the other two histories. */
+.history {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.history-row {
+  position: relative;
+  display: grid;
+  gap: 0.6rem;
+  padding: 1.1rem 1.25rem;
+}
+
+.history-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.history-row .purpose {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.history-row .actions {
+  margin: 0;
+}
+
+.request-id {
+  margin: 0;
+  font-size: 0.75rem;
+  opacity: 0.7;
 }
 
 .claims {

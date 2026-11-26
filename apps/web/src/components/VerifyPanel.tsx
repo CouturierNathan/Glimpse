@@ -16,6 +16,7 @@ import { attributeCategories, attributesOf } from '@/lib/vault/attributes.ts'
 
 import { ConfirmButton, ErrorNotice, FieldError, useFieldErrors } from './Form.tsx'
 import { useI18n } from './I18nProvider.tsx'
+import { Select } from './Select.tsx'
 
 /**
  * The requester's side: ask for one or more pieces of information, without a wallet or an
@@ -127,13 +128,15 @@ export function VerifyPanel() {
 
         <div className="field">
           <label htmlFor="lifetime">{t('verify.lifetime')}</label>
-          <select id="lifetime" name="lifetime" defaultValue="24">
-            {REQUEST_LIFETIMES_HOURS.map((hours) => (
-              <option key={hours} value={hours}>
-                {t(`verify.lifetime.${hours}`)}
-              </option>
-            ))}
-          </select>
+          <Select
+            id="lifetime"
+            name="lifetime"
+            defaultValue="24"
+            options={REQUEST_LIFETIMES_HOURS.map((hours) => ({
+              value: String(hours),
+              label: t(`verify.lifetime.${hours}`),
+            }))}
+          />
         </div>
 
         <div className="actions">
