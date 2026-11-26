@@ -135,8 +135,11 @@ export const importAttributes: readonly ImportAttribute[] = [
   },
 ]
 
-/** The extraction service reads at most this many attributes in one run. */
-export const MAX_ATTRIBUTES_PER_IMPORT = 16
+/**
+ * One run may ask for every piece of information the app knows: the screen ticks them all by
+ * default, and a document that says nothing about one simply does not answer for it.
+ */
+export const MAX_ATTRIBUTES_PER_IMPORT = 19
 
 /**
  * The kind every import declares. The holder no longer picks one: the extractor reads the same

@@ -114,7 +114,9 @@ export function createPrivateExtractionService(options: {
           return result
         },
       }
-      const claims = await extractClaims(document, specs, model)
+      // The holder may tick more than one document carries; what is missing is left out, never
+      // guessed, and the screen tells them which attributes the document did not hold.
+      const claims = await extractClaims(document, specs, model, { skipMissing: true })
       await authorize(document, names) // withdrawal/expiry while inference was running
       return claims
     } catch (error) {

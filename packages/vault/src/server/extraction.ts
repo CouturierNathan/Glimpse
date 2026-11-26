@@ -60,8 +60,16 @@ function literal(spec: AttributeSpec, quote: string): ClaimValue {
  * document describing a person carries more than a handful of fields, so a request covering an
  * identity, an address and a job fits without being split.
  */
-export const MAX_SPECS = 16
-export function selectedExcerpts(document: ExtractionDocument, specs: AttributeSpec[]) {
+export const MAX_SPECS = 24
+export interface ExtractionOptions {
+  /** Leave out an attribute the document says nothing about, instead of failing the whole run. */
+  skipMissing?: boolean
+}
+export function selectedExcerpts(
+  document: ExtractionDocument,
+  specs: AttributeSpec[],
+  { skipMissing = false }: ExtractionOptions = {},
+) {
   if (
     !document ||
     document.kind === 'identity' ||
@@ -97,7 +105,7 @@ export function selectedExcerpts(document: ExtractionDocument, specs: AttributeS
     }
     seen.add(p.page)
   }
-  return specs.map((spec) => {
+  const excerpts = specs.flatMap((spec) => {
     if (
       !/^[a-z][a-z0-9_.]{0,127}$/.test(spec.attribute) ||
       !/^[a-zA-Z][a-zA-Z0-9 _.-]{0,63}$/.test(spec.label) ||
@@ -111,34 +119,44 @@ export function selectedExcerpts(document: ExtractionDocument, specs: AttributeS
         .filter((line) => new RegExp(`^${escape(spec.label)}\\s*[:=]`, 'i').test(line))
         .map((quote) => ({ page: p.page, quote })),
     )
+    // A document that says nothing about an attribute is not an error: the holder asked for it,
+    // and the answer is that it is not in there. Nothing is invented for it. Two lines for the
+    // same attribute stay an error — which of them is meant is a guess, and guessing is the one
+    // thing this extractor must not do.
+    if (matches.length === 0 && skipMissing) return []
     if (matches.length !== 1 || matches[0] === undefined || matches[0].quote.length > 600) {
       throw new ExtractionError()
     }
     const found = matches[0]
     literal(spec, found.quote)
-    return { attribute: spec.attribute, type: spec.type, ...found }
+    return [{ attribute: spec.attribute, type: spec.type, ...found }]
   })
+  // Asking for nothing the document holds is still a failed run, not an empty success.
+  if (excerpts.length === 0) throw new ExtractionError()
+  return excerpts
 }
 /** Conservative literal extraction. Ambiguous/free-form semantics require holder correction, not guessing. */
 export async function extractClaims(
   document: ExtractionDocument,
   specs: AttributeSpec[],
   model: ExtractionModel,
+  options: ExtractionOptions = {},
 ): Promise<ExtractedClaim[]> {
   try {
     const doc = structuredClone(document)
     const attributes = structuredClone(specs)
-    const excerpts = selectedExcerpts(doc, attributes)
+    // Only the attributes the document actually carries reach the model, so one entry comes back
+    // per excerpt, never per attribute asked for.
+    const excerpts = selectedExcerpts(doc, attributes, options)
     const result = await model.complete(system, JSON.stringify(excerpts))
-    if (!Array.isArray(result) || result.length !== attributes.length) throw new ExtractionError()
+    if (!Array.isArray(result) || result.length !== excerpts.length) throw new ExtractionError()
     const claims = result.map((raw) => {
       const c = object(raw)
       if (Object.keys(c).sort().join(',') !== 'attribute,confidence,end,page,quote,start,value') {
         throw new ExtractionError()
       }
-      const index = attributes.findIndex((s) => s.attribute === c.attribute)
-      const spec = attributes[index]
-      const excerpt = excerpts[index]
+      const excerpt = excerpts.find((e) => e.attribute === c.attribute)
+      const spec = attributes.find((s) => s.attribute === c.attribute)
       if (
         !spec ||
         !excerpt ||

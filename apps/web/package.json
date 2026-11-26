@@ -11,7 +11,7 @@
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "npm run typecheck && node --test \"src/**/*.test.ts\" && npm run check:demo",
-    "check:demo": "node scripts/check-demo-documents.ts",
+    "check:demo": "node scripts/check-demo-documents.ts && node scripts/check-partial-import.ts",
     "fixtures:identity": "node scripts/make-fake-identity-pdf.ts",
     "e2e": "node scripts/e2e-smoke.ts"
   },

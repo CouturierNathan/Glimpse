@@ -21,6 +21,7 @@ import {
   attributeCategories,
   attributesOf,
   IMPORT_DOCUMENT_KIND,
+  importAttributes,
   MAX_ATTRIBUTES_PER_IMPORT,
   NAME_ATTRIBUTE,
   uploadMediaType,
@@ -30,6 +31,7 @@ import { rawClaimValue, reviewClaim } from '@/lib/vault/review.ts'
 import { FilePicker } from './FilePicker.tsx'
 import { ErrorNotice, FieldError, Notice, useFieldErrors } from './Form.tsx'
 import { useI18n } from './I18nProvider.tsx'
+import { Select } from './Select.tsx'
 import { useSession } from './SessionProvider.tsx'
 import { StatusBadge } from './StatusBadge.tsx'
 import { useVault, VaultError } from './VaultProvider.tsx'
@@ -69,6 +71,10 @@ type Step =
  * file is checked in this browser — addressed to this wallet, on this network, recorded on chain
  * and not revoked. Either way, every value is encrypted here before it is stored.
  */
+
+/** Everything the holder can tick: the name is always read, so it is not one of them. */
+const optional = importAttributes.filter((a) => a.attribute !== NAME_ATTRIBUTE)
+
 export function ImportPanel() {
   const { request, store, storeAttestation } = useVault()
   const { address } = useSession()
@@ -77,7 +83,11 @@ export function ImportPanel() {
   const post = (url: string, init: RequestInit) => request(url, { method: 'POST', ...init })
   const [step, setStep] = useState<Step>({ name: 'idle' })
   const [kind, setKind] = useState<FileKind | null>(null)
+  // Everything is ticked to start with: a document answers for what it holds and stays silent on
+  // the rest, so asking for all of it costs the holder nothing.
+  const [selected, setSelected] = useState<string[]>(() => optional.map((a) => a.attribute))
   const busy = step.name === 'reading' || step.name === 'encrypting'
+  const allSelected = selected.length === optional.length
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -87,7 +97,7 @@ export function ImportPanel() {
     const chosen = file instanceof File && file.size > 0 ? file : null
     const fileKind = chosen ? kindOf(chosen) : null
     // The name is always read: the server matches it with the verified identity.
-    const attributes = [NAME_ATTRIBUTE, ...data.getAll('info').map(String)]
+    const attributes = [NAME_ATTRIBUTE, ...selected]
     const ok = fields.report(
       {
         file: chosen ? undefined : t('import.chooseFirst'),
@@ -266,14 +276,15 @@ export function ImportPanel() {
               <fieldset key={claim.claimId} className="review-item">
                 <legend>{attr(claim.attribute)}</legend>
                 {claim.value.type === 'boolean' ? (
-                  <select
+                  <Select
                     name={`value-${claim.claimId}`}
                     defaultValue={rawClaimValue(claim.value)}
                     aria-label={label}
-                  >
-                    <option value="true">{t('common.yes')}</option>
-                    <option value="false">{t('common.no')}</option>
-                  </select>
+                    options={[
+                      { value: 'true', label: t('common.yes') },
+                      { value: 'false', label: t('common.no') },
+                    ]}
+                  />
                 ) : (
                   <input
                     name={`value-${claim.claimId}`}
@@ -393,9 +404,19 @@ export function ImportPanel() {
         <>
           <fieldset className="field" data-invalid={fields.errors.attributes ? '' : undefined}>
             <legend>{t('import.attributes')}</legend>
-            <span className="hint">
-              {t('import.attributesHint', { max: MAX_ATTRIBUTES_PER_IMPORT })}
-            </span>
+            <div className="select-all">
+              <span className="hint">{t('import.attributesHint')}</span>
+              <button
+                type="button"
+                className="button quiet small"
+                onClick={() => {
+                  setSelected(allSelected ? [] : optional.map((a) => a.attribute))
+                  fields.clear('attributes')
+                }}
+              >
+                {allSelected ? t('import.selectNone') : t('import.selectAll')}
+              </button>
+            </div>
             <div className="groups">
               {attributeCategories.map((group) => (
                 <div key={group.category} className="group">
@@ -416,8 +437,15 @@ export function ImportPanel() {
                             type="checkbox"
                             name="info"
                             value={a.attribute}
-                            defaultChecked={group.category === 'identity'}
-                            onChange={() => fields.clear('attributes')}
+                            checked={selected.includes(a.attribute)}
+                            onChange={(event) => {
+                              setSelected((current) =>
+                                event.target.checked
+                                  ? [...current, a.attribute]
+                                  : current.filter((name) => name !== a.attribute),
+                              )
+                              fields.clear('attributes')
+                            }}
                             {...(a.attribute === 'date_of_birth'
                               ? { 'data-field': 'attributes' }
                               : {})}
