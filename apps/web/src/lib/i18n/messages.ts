@@ -93,14 +93,34 @@ const en = {
   'status.undetermined.meaning':
     'Not checked against the chain yet, or the chain could not be read.',
 
+  // History
+  'history.title': 'Your requests',
+  'history.text':
+    'What you were asked and what you asked for, from this browser. Kept here, never on the server.',
+  'history.received': 'Received',
+  'history.sent': 'Sent',
+  'history.asked': 'Asked for',
+  'history.shared': 'Shared',
+  'history.nothing': 'Nothing',
+  'history.on': 'Asked on',
+  'history.until': 'Open until',
+  'history.expired': 'Expired on',
+  'history.details': 'Details',
+  'history.loading': 'Reading your requests…',
+  'history.empty': 'Nothing yet. A request you open or create appears here.',
+
   // Sources
-  'source.A': 'Imported',
-  'source.A.text': 'Read from a document you added. Useful to you, but nobody vouches for it yet.',
-  'source.B': 'Signature verified',
-  'source.B.text': 'The document carries a digital signature, and Glimpse checked it.',
-  'source.C': 'Attested',
-  'source.C.title': 'Attested by an organisation',
-  'source.C.text': 'An organisation signed this information and recorded it on chain.',
+  'source.A': 'Declared',
+  'source.A.title': 'Declared by you',
+  'source.A.text': 'Read from a document you added, or entered by you. Nobody else vouches for it.',
+  'source.B': 'From a document',
+  'source.B.title': 'From a checked document',
+  'source.B.text':
+    'Read from a document whose origin Glimpse could check. That does not make it authentic: no organisation stands behind the value itself.',
+  'source.C': 'Authentic',
+  'source.C.title': 'Authentic, attested by an organisation',
+  'source.C.text':
+    'An organisation signed this information and recorded it on chain. It is the only kind a requester can verify end to end.',
 
   // Attributes
   'cat.identity': 'Identity',
@@ -206,7 +226,9 @@ const en = {
     'A PDF or text document in your name (5 MB max), or the .json attestation an organisation sent you.',
   'import.attributes': 'Information to read',
   'import.attributesHint':
-    'Only what you tick is read, at most {max} items. Everything else is ignored.',
+    'Only what you tick is read. Whatever the document does not hold is simply left out, never invented.',
+  'import.selectAll': 'Tick everything',
+  'import.selectNone': 'Untick everything',
   'import.nameRequired': 'Always read, to check the document is in your name.',
   'import.consent':
     'Glimpse may read this document on its server to extract the information above. The text is not kept, and each value is encrypted in this browser before it is saved.',
@@ -544,14 +566,33 @@ const fr: Messages = {
   'status.undetermined.meaning':
     'Pas encore vérifiée sur la blockchain, ou la blockchain n’a pas pu être lue.',
 
-  'source.A': 'Importée',
+  'history.title': 'Vos demandes',
+  'history.text':
+    'Ce qu’on vous a demandé et ce que vous avez demandé, depuis ce navigateur. Conservé ici, jamais sur le serveur.',
+  'history.received': 'Reçues',
+  'history.sent': 'Envoyées',
+  'history.asked': 'Demandé',
+  'history.shared': 'Partagé',
+  'history.nothing': 'Rien',
+  'history.on': 'Demandé le',
+  'history.until': 'Ouverte jusqu’au',
+  'history.expired': 'Expirée le',
+  'history.details': 'Détails',
+  'history.loading': 'Lecture de vos demandes…',
+  'history.empty': 'Rien pour l’instant. Une demande ouverte ou créée apparaîtra ici.',
+
+  'source.A': 'Déclarée',
+  'source.A.title': 'Déclarée par vous',
   'source.A.text':
-    'Lue dans un document que vous avez ajouté. Utile pour vous, mais personne ne la garantit encore.',
-  'source.B': 'Signature vérifiée',
-  'source.B.text': 'Le document porte une signature électronique, et Glimpse l’a vérifiée.',
-  'source.C': 'Attestée',
-  'source.C.title': 'Attestée par une organisation',
-  'source.C.text': 'Une organisation a signé cette information et l’a inscrite sur la blockchain.',
+    'Lue dans un document que vous avez ajouté, ou saisie par vos soins. Personne d’autre ne la garantit.',
+  'source.B': 'Issue d’un document',
+  'source.B.title': 'Issue d’un document vérifié',
+  'source.B.text':
+    'Lue dans un document dont Glimpse a pu contrôler l’origine. Cela ne la rend pas authentique : aucune organisation ne s’engage sur la valeur elle-même.',
+  'source.C': 'Authentique',
+  'source.C.title': 'Authentique, attestée par une organisation',
+  'source.C.text':
+    'Une organisation a signé cette information et l’a inscrite sur la blockchain. C’est la seule catégorie qu’un demandeur peut vérifier de bout en bout.',
 
   'cat.identity': 'Identité',
   'cat.address': 'Adresse',
@@ -653,7 +694,9 @@ const fr: Messages = {
     'Un document PDF ou texte à votre nom (5 Mo max), ou l’attestation .json envoyée par une organisation.',
   'import.attributes': 'Informations à lire',
   'import.attributesHint':
-    'Seules les cases cochées sont lues, {max} au maximum. Le reste du document est ignoré.',
+    'Seules les cases cochées sont lues. Ce que le document ne contient pas est simplement laissé de côté, jamais inventé.',
+  'import.selectAll': 'Tout cocher',
+  'import.selectNone': 'Tout décocher',
   'import.nameRequired': 'Toujours lu, pour vérifier que le document est à votre nom.',
   'import.consent':
     'Glimpse peut lire ce document sur son serveur pour en extraire les informations ci-dessus. Le texte n’est pas conservé, et chaque valeur est chiffrée dans ce navigateur avant d’être enregistrée.',
