@@ -1,13 +1,23 @@
 import { constants } from 'node:fs'
 import { link, lstat, mkdir, open, realpath, unlink } from 'node:fs/promises'
 import { randomBytes } from 'node:crypto'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { assertHolderId, assertReference, StorageError } from './storage.ts'
 import type { StorageBackend } from './storage.ts'
 
-export const DEFAULT_STORAGE_DIRECTORY = fileURLToPath(
-  new URL('../../.vault-data/', import.meta.url),
+/**
+ * Where the package writes when the caller names no directory: `<package>/.vault-data`.
+ *
+ * Built from `dirname(fileURLToPath(import.meta.url))` rather than
+ * `new URL('../../.vault-data/', import.meta.url)`, which a bundler reads as an asset to resolve
+ * at build time and then fails on, this directory existing only at run time. A caller that
+ * bundles this module does not rely on the default: it passes `directory`, as the web app does
+ * from `VAULT_DATA_DIR`.
+ */
+export const DEFAULT_STORAGE_DIRECTORY = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../.vault-data/',
 )
 function code(error: unknown): string | undefined {
   return error && typeof error === 'object' && 'code' in error ? String(error.code) : undefined
@@ -35,7 +45,9 @@ async function syncDirectory(directory: string): Promise<void> {
 export async function createFileStorageBackend(
   options: { directory?: string } = {},
 ): Promise<StorageBackend> {
-  const root = resolve(options.directory ?? DEFAULT_STORAGE_DIRECTORY)
+  // The root and the paths under it are data the service is configured with, not modules: told
+  // nothing, a bundler traces the whole repository into the deployed function to be safe.
+  const root = resolve(/* turbopackIgnore: true */ options.directory ?? DEFAULT_STORAGE_DIRECTORY)
   // Do not silently weaken symlink protection on an unsupported filesystem/platform.
   if (typeof constants.O_NOFOLLOW !== 'number' || typeof constants.O_NONBLOCK !== 'number') {
     throw new StorageError('UNAVAILABLE')
@@ -49,7 +61,7 @@ export async function createFileStorageBackend(
   async function directory(holderId: string, create: boolean): Promise<string | null> {
     assertHolderId(holderId)
     await checkDirectory(root)
-    const dir = join(root, holderId)
+    const dir = join(/* turbopackIgnore: true */ root, holderId)
     try {
       if (create) {
         await mkdir(dir, { mode: 0o700 }).catch((error) => {

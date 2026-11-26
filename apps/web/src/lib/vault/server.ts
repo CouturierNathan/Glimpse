@@ -28,13 +28,12 @@ export const consents = (shared.glimpseConsents ??= new ExtractionConsentStore()
 export const requests = (shared.glimpseRequests ??= new RequestStore())
 
 /**
- * The vault's server module, loaded by Node at run time rather than bundled: Turbopack cannot
- * bundle its file storage, which resolves `new URL('../../.vault-data/', import.meta.url)`.
+ * The vault's server module, imported once per process. The import is bundled, not left to Node
+ * at run time: a host that builds the app into a serverless function only ships what the bundler
+ * traced, and an import it was told to ignore is missing there.
  */
 export function vaultServer(): Promise<VaultServer> {
-  return (shared.glimpseVaultServer ??= import(
-    /* turbopackIgnore: true */ /* webpackIgnore: true */ '@glimpse/vault/server'
-  ))
+  return (shared.glimpseVaultServer ??= import('@glimpse/vault/server'))
 }
 
 /** A private directory on a persistent disk, set by the server, never by a request. */
