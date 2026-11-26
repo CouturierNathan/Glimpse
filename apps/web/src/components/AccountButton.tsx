@@ -7,9 +7,11 @@ import { shortAddress } from '@/lib/format.ts'
 
 import { useI18n } from './I18nProvider.tsx'
 import { useSession } from './SessionProvider.tsx'
+import { useVault } from './VaultProvider.tsx'
 
 export function AccountButton() {
-  const { status, address, signOut } = useSession()
+  const { status, address } = useSession()
+  const { signOut } = useVault()
   const { t } = useI18n()
   const router = useRouter()
   const pathname = usePathname()

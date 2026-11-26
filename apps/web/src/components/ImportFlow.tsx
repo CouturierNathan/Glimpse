@@ -1,6 +1,6 @@
 'use client'
 
-import { LockIcon } from './AttestationImport.tsx'
+import { LockIcon } from './Icons.tsx'
 import { useI18n } from './I18nProvider.tsx'
 import { useIdentity } from './IdentityProvider.tsx'
 import { IdentityPanel } from './IdentityPanel.tsx'

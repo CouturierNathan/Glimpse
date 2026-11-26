@@ -1,3 +1,5 @@
+import { walletMessages } from '../wallet-messages.ts'
+
 /*
  * Every word the app shows, in English and French. Components read them through `useI18n()` (or
  * `<T k="…" />` in server pages); nothing on screen is written inline. `{name}` is replaced by the
@@ -127,13 +129,13 @@ const en = {
 
   // Vault
   'vault.lede':
-    'Your information, each item marked with where it comes from. Only you can open it.',
+    'Your information, each item marked with where it comes from. Only you can open it, and you share it through the requests you receive.',
   'vault.storage.title': 'Temporary storage',
   'vault.storage.text':
     'Your data stays encrypted, but is automatically deleted when the server restarts.',
   'vault.empty.title': 'Your vault is empty',
   'vault.empty.text':
-    'Import a document to add your first information, or add an attestation an organisation sent you.',
+    'Import a document or an attestation from an organisation to add your first information.',
   'vault.empty.cta': 'Import a document',
   'vault.show': 'Show',
   'vault.hide': 'Hide',
@@ -143,7 +145,7 @@ const en = {
   'vault.itemError':
     'This item could not be opened or deleted. It may have been changed on the server.',
   'vault.keyHint':
-    'Your encryption key lives in this tab only. Reloading the page locks these items.',
+    'Your encryption keys stay in this browser and never leave it. Signing out deletes them from here.',
   'vault.statusTitle': 'What each status means',
   'vault.sourcesTitle': 'Where your information comes from',
   'vault.count': '{count} items',
@@ -195,12 +197,13 @@ const en = {
 
   // Import
   'import.lede':
-    'Verify your identity, then add a document and choose what to read from it. The information stays marked as imported until a signature or an organisation backs it.',
+    'Verify your identity, then add a document or an organisation’s attestation: Glimpse recognises what it is and runs the right checks.',
   'import.identityTitle': 'Your identity',
-  'import.documentTitle': 'Add a document',
+  'import.documentTitle': 'Add a document or an attestation',
   'import.locked': 'Available once your identity is verified.',
   'import.file': 'Document',
-  'import.fileHint': 'A PDF or a text file, up to 5 MB, in your name.',
+  'import.fileHint':
+    'A PDF or text document in your name (5 MB max), or the .json attestation an organisation sent you.',
   'import.attributes': 'Information to read',
   'import.attributesHint':
     'Only what you tick is read, at most {max} items. Everything else is ignored.',
@@ -241,7 +244,7 @@ const en = {
 
   // Requests (holder)
   'requests.lede':
-    'Requesters ask for one precise piece of information. You accept or refuse each request.',
+    'A requester sends you a link. Open it to see what they ask and why, then choose what to share.',
   'requests.open.title': 'Open a request',
   'requests.open.text': 'A requester sends you a link. Open it directly, or paste it here.',
   'requests.open.label': 'Request link',
@@ -251,9 +254,9 @@ const en = {
   'requests.legend.title': 'What a requester can conclude',
   'requests.legend.text':
     'The requester checks what you share on their own, against the chain, and reaches one of these statuses.',
-  'request.title': 'A request for one piece of information',
+  'request.title': 'A request for information',
   'request.lede':
-    'Read who is asking and why. You share one value, or nothing: the rest of your vault stays closed.',
+    'Read who is asking and why. You choose what to share, piece by piece: the rest of your vault stays closed.',
   'request.loading': 'Loading the request…',
   'request.loadFailed': 'This request could not be loaded.',
   'request.requester': 'Requester',
@@ -264,7 +267,7 @@ const en = {
   'request.noMatch':
     'Your vault has no “{name}” in this browser. Import a document that contains it, then come back to this link.',
   'request.importCta': 'Import a document',
-  'request.which': 'Which one to share',
+  'request.which': 'What you share',
   'request.decrypting': 'Decrypting…',
   'request.cannotOpen': 'Cannot be opened',
   'request.shareHint':
@@ -281,17 +284,17 @@ const en = {
   'request.closed.withdrawn':
     'You withdrew your consent. The requester can no longer download the item.',
   'request.closed.expired': 'This request has expired. Ask the requester for a new link.',
-  'request.closed.answered': 'Someone already answered this request.',
+  'request.closed.answered': 'This request has already been answered.',
   'request.failed': 'That did not work, try again.',
 
   // Verify (requester)
   'verify.lede':
-    'Ask someone for one piece of information. You sign the request with your wallet, they decide, and your browser checks their answer against the chain.',
+    'Ask someone for one or more pieces of information. No wallet needed: you send a link, they choose what to share, and your browser checks their answer against the chain.',
   'verify.what': 'What to check',
   'verify.why': 'Why you need it',
   'verify.whyPlaceholder': 'Check the exam score for the master’s admission',
   'verify.whyHint': 'The holder reads this before deciding.',
-  'verify.submit': 'Sign and create the request',
+  'verify.submit': 'Create the request',
   'verify.signing': 'Sign in your wallet…',
   'verify.waiting': 'Waiting for the holder',
   'verify.waitingHint':
@@ -352,6 +355,100 @@ const en = {
   'issue.list.hint':
     'The chain keeps only ids, dates and salted commitments: holders and values stay off it.',
 
+  // Final pass
+  'form.required': 'Fill in this field.',
+  'form.tooLong': '{max} characters at most.',
+  'form.number': 'Enter a number.',
+  'form.date': 'Enter a valid date.',
+  'form.address': 'Enter a wallet address: 0x followed by 40 characters.',
+  'form.range': 'Enter a whole number from {min} to {max}.',
+  'import.kind.document': 'Document',
+  'import.kind.documentText':
+    'Glimpse reads the information you tick below and checks the document is in your name. A signed PDF is recognised automatically.',
+  'import.kind.attestation': 'Attestation from an organisation',
+  'import.kind.attestationText':
+    'Glimpse checks it was issued to your wallet, is recorded on chain and is not revoked, then encrypts it in this browser.',
+  'import.submitAttestation': 'Check and add to my vault',
+  'import.checkingAttestation': 'Checking the attestation…',
+  'import.done.attestation':
+    'The requester who checks it will see whether it is still valid on chain.',
+  'attestation.missing':
+    'This attestation is not recorded on the chain. Ask the organisation to record it.',
+  'attestation.revoked': 'The organisation revoked this attestation: it no longer proves anything.',
+  'issue.gasHint':
+    'Recording on chain is a Base Sepolia transaction: your wallet asks you to confirm it and pay a small test-network fee.',
+  'issue.list.revokeTitle': 'Revoke this attestation?',
+  'issue.list.revokeText': 'Every requester will see it as revoked. This cannot be undone.',
+  'vault.add': 'Add',
+  'vault.loading': 'Opening your vault…',
+  'vault.deleteTitle': 'Delete this item?',
+  'vault.deleteText': '“{name}” will be deleted from your vault. This cannot be undone.',
+  'vault.shareHint': 'To share an item, open the link a requester sent you in',
+  'vault.shareLink': 'Requests',
+  'request.declared': 'Name given by the requester, not verified.',
+  'request.whichHint':
+    'Choose, for each piece, the value to share or “Don’t share”. Nothing else leaves your vault.',
+  'request.dontShare': 'Don’t share',
+  'request.notInVault': 'Not in your vault.',
+  'request.emptyVault':
+    'Your vault holds none of the information asked for. Import a document that contains it, then come back to this link.',
+  'request.pickOne': 'Choose at least one value to share, or refuse the request.',
+  'request.shareSelection': 'Share my selection',
+  'request.refuseAll': 'Refuse the request',
+  'request.refuseTitle': 'Refuse this request?',
+  'request.refuseText': 'The requester will see that you refused. Nothing is shared.',
+  'request.withdrawTitle': 'Withdraw your consent?',
+  'request.withdrawText':
+    'The requester can no longer download what you shared. A copy already received cannot be erased.',
+  'request.signIn.title': 'Sign in to answer',
+  'request.signIn.text':
+    'Reading this request needs no account. To share information, sign in with your wallet: your vault opens in this browser.',
+  'request.signIn.cta': 'Sign in to answer',
+  'status.title': 'Your request',
+  'status.lede':
+    'Send the link to the person concerned. Their answers appear here and are checked in your browser.',
+  'status.share.title': 'Link to send',
+  'status.share.text':
+    'Anyone with this link can read what you ask, never a value. Only you, in this browser, can read the answers.',
+  'status.answers': 'Answers',
+  'status.checks': 'Details of the checks',
+  'status.expiredOn': 'Expired on',
+  'status.withdrawnAfter': 'The holder has since withdrawn their consent.',
+  'status.otherBrowser.title': 'This request is not in this browser',
+  'status.otherBrowser.text':
+    'Only the browser that created a request can read its answers. Open it there, or create a new one.',
+  'status.newRequest': 'New request',
+  'state.pending': 'Waiting for an answer',
+  'state.refused': 'Refused',
+  'state.allowed': 'Being sent',
+  'state.shared': 'Shared',
+  'state.withdrawn': 'Consent withdrawn',
+  'state.expired': 'Expired',
+  'state.answered': 'Already answered',
+  'verify.name': 'Who is asking',
+  'verify.namePlaceholder': 'Epitech admissions',
+  'verify.nameHint': 'Your name or your organisation’s, shown to the person you ask.',
+  'verify.whatHint':
+    'Tick up to {max} pieces of information. The person chooses which ones to share.',
+  'verify.pickOne': 'Tick at least one piece of information.',
+  'verify.tooMany': 'Tick {max} pieces of information at most.',
+  'verify.lifetime': 'Valid for',
+  'verify.lifetime.1': '1 hour',
+  'verify.lifetime.24': '24 hours',
+  'verify.lifetime.168': '7 days',
+  'verify.creating': 'Creating the request…',
+  'verify.createFailed': 'The request could not be created. Try again.',
+  'verify.noWallet':
+    'No wallet and no account needed. The request and the keys that read the answers stay in this browser.',
+  'verify.mine': 'Your requests in this browser',
+  'verify.until': 'Open until {date}',
+  'verify.expiredOn': 'Expired on {date}',
+  'verify.open': 'Open',
+  'verify.forget': 'Forget',
+  'verify.forgetTitle': 'Forget this request?',
+  'verify.forgetText':
+    'Its keys are deleted from this browser: its answers can no longer be read here.',
+  'verify.shareSheet': 'Share',
   // Wallet errors
   'wallet.none': 'No browser wallet found. Install MetaMask or another Ethereum wallet.',
   'wallet.cancelled': 'You cancelled the request in your wallet.',
@@ -480,13 +577,14 @@ const fr: Messages = {
   'attr.contract_type': 'Type de contrat',
   'attr.annual_salary': 'Salaire annuel (EUR)',
 
-  'vault.lede': 'Vos informations, chacune marquée de sa provenance. Vous seul pouvez les ouvrir.',
+  'vault.lede':
+    'Vos informations, chacune marquée de sa provenance. Vous seul pouvez les ouvrir, et vous les partagez via les demandes reçues.',
   'vault.storage.title': 'Stockage temporaire',
   'vault.storage.text':
     'Vos données restent chiffrées, mais sont automatiquement supprimées lors du redémarrage du serveur.',
   'vault.empty.title': 'Votre coffre est vide',
   'vault.empty.text':
-    'Importez un document pour ajouter vos premières informations, ou ajoutez une attestation reçue d’une organisation.',
+    'Importez un document ou une attestation d’organisation pour ajouter vos premières informations.',
   'vault.empty.cta': 'Importer un document',
   'vault.show': 'Afficher',
   'vault.hide': 'Masquer',
@@ -496,7 +594,7 @@ const fr: Messages = {
   'vault.itemError':
     'Cet élément n’a pas pu être ouvert ou supprimé. Il a peut-être été modifié sur le serveur.',
   'vault.keyHint':
-    'Votre clé de chiffrement n’existe que dans cet onglet. Recharger la page verrouille ces éléments.',
+    'Vos clés de chiffrement restent dans ce navigateur et ne le quittent jamais. La déconnexion les supprime d’ici.',
   'vault.statusTitle': 'Ce que signifie chaque statut',
   'vault.sourcesTitle': 'D’où viennent vos informations',
   'vault.count': '{count} éléments',
@@ -546,12 +644,13 @@ const fr: Messages = {
     'Cette signature lie un document France Identité valablement signé à ce portefeuille. Elle ne prouve pas que la personne qui détient le portefeuille est celle que nomme le document.',
 
   'import.lede':
-    'Vérifiez votre identité, puis ajoutez un document et choisissez ce qu’il faut y lire. Les informations restent marquées comme importées tant qu’aucune signature ni organisation ne les garantit.',
+    'Vérifiez votre identité, puis ajoutez un document ou l’attestation d’une organisation : Glimpse reconnaît sa nature et applique les contrôles adaptés.',
   'import.identityTitle': 'Votre identité',
-  'import.documentTitle': 'Ajouter un document',
+  'import.documentTitle': 'Ajouter un document ou une attestation',
   'import.locked': 'Disponible une fois votre identité vérifiée.',
   'import.file': 'Document',
-  'import.fileHint': 'Un PDF ou un fichier texte, 5 Mo maximum, à votre nom.',
+  'import.fileHint':
+    'Un document PDF ou texte à votre nom (5 Mo max), ou l’attestation .json envoyée par une organisation.',
   'import.attributes': 'Informations à lire',
   'import.attributesHint':
     'Seules les cases cochées sont lues, {max} au maximum. Le reste du document est ignoré.',
@@ -590,7 +689,7 @@ const fr: Messages = {
   'file.aria': '{label} : choisir un fichier',
 
   'requests.lede':
-    'Les vérificateurs demandent une information précise. Vous acceptez ou refusez chaque demande.',
+    'Un vérificateur vous envoie un lien. Ouvrez-le pour voir ce qu’il demande et pourquoi, puis choisissez ce que vous partagez.',
   'requests.open.title': 'Ouvrir une demande',
   'requests.open.text':
     'Un vérificateur vous envoie un lien. Ouvrez-le directement, ou collez-le ici.',
@@ -601,9 +700,9 @@ const fr: Messages = {
   'requests.legend.title': 'Ce qu’un vérificateur peut conclure',
   'requests.legend.text':
     'Le vérificateur contrôle lui-même ce que vous partagez, sur la blockchain, et obtient l’un de ces statuts.',
-  'request.title': 'Une demande pour une seule information',
+  'request.title': 'Une demande d’informations',
   'request.lede':
-    'Lisez qui demande et pourquoi. Vous partagez une valeur, ou rien : le reste de votre coffre reste fermé.',
+    'Lisez qui demande et pourquoi. Vous choisissez ce que vous partagez, information par information : le reste de votre coffre reste fermé.',
   'request.loading': 'Chargement de la demande…',
   'request.loadFailed': 'Cette demande n’a pas pu être chargée.',
   'request.requester': 'Vérificateur',
@@ -614,7 +713,7 @@ const fr: Messages = {
   'request.noMatch':
     'Votre coffre ne contient pas « {name} » dans ce navigateur. Importez un document qui la contient, puis revenez sur ce lien.',
   'request.importCta': 'Importer un document',
-  'request.which': 'Laquelle partager',
+  'request.which': 'Ce que vous partagez',
   'request.decrypting': 'Déchiffrement…',
   'request.cannotOpen': 'Impossible à ouvrir',
   'request.shareHint':
@@ -631,16 +730,16 @@ const fr: Messages = {
   'request.closed.withdrawn':
     'Vous avez retiré votre accord. Le vérificateur ne peut plus télécharger l’élément.',
   'request.closed.expired': 'Cette demande a expiré. Demandez un nouveau lien au vérificateur.',
-  'request.closed.answered': 'Quelqu’un a déjà répondu à cette demande.',
+  'request.closed.answered': 'Cette demande a déjà reçu une réponse.',
   'request.failed': 'Cela n’a pas fonctionné, réessayez.',
 
   'verify.lede':
-    'Demandez une information à quelqu’un. Vous signez la demande avec votre portefeuille, la personne décide, et votre navigateur contrôle sa réponse sur la blockchain.',
-  'verify.what': 'Information à vérifier',
+    'Demandez une ou plusieurs informations à quelqu’un. Aucun portefeuille requis : vous envoyez un lien, la personne choisit ce qu’elle partage, et votre navigateur contrôle sa réponse sur la blockchain.',
+  'verify.what': 'Informations à vérifier',
   'verify.why': 'Motif de la demande',
   'verify.whyPlaceholder': 'Vérifier la note d’examen pour l’admission en master',
   'verify.whyHint': 'Le titulaire le lit avant de décider.',
-  'verify.submit': 'Signer et créer la demande',
+  'verify.submit': 'Créer la demande',
   'verify.signing': 'Signez dans votre portefeuille…',
   'verify.waiting': 'En attente du titulaire',
   'verify.waitingHint':
@@ -701,6 +800,100 @@ const fr: Messages = {
   'issue.list.hint':
     'La blockchain ne garde que des identifiants, des dates et des engagements salés : ni titulaires ni valeurs.',
 
+  'form.required': 'Renseignez ce champ.',
+  'form.tooLong': '{max} caractères au maximum.',
+  'form.number': 'Saisissez un nombre.',
+  'form.date': 'Saisissez une date valide.',
+  'form.address': 'Saisissez une adresse de portefeuille : 0x suivi de 40 caractères.',
+  'form.range': 'Saisissez un nombre entier de {min} à {max}.',
+  'import.kind.document': 'Document',
+  'import.kind.documentText':
+    'Glimpse lit les informations cochées ci-dessous et vérifie que le document est à votre nom. Un PDF signé est reconnu automatiquement.',
+  'import.kind.attestation': 'Attestation d’une organisation',
+  'import.kind.attestationText':
+    'Glimpse vérifie qu’elle a été émise pour votre portefeuille, qu’elle est inscrite sur la blockchain et non révoquée, puis la chiffre dans ce navigateur.',
+  'import.submitAttestation': 'Vérifier et ajouter à mon coffre',
+  'import.checkingAttestation': 'Vérification de l’attestation…',
+  'import.done.attestation':
+    'Le vérificateur qui la contrôlera verra si elle est toujours valide sur la blockchain.',
+  'attestation.missing':
+    'Cette attestation n’est pas inscrite sur la blockchain. Demandez à l’organisation de l’inscrire.',
+  'attestation.revoked': 'L’organisation a révoqué cette attestation : elle ne prouve plus rien.',
+  'issue.gasHint':
+    'L’inscription sur la blockchain est une transaction Base Sepolia : votre portefeuille vous demande de la confirmer et de payer de faibles frais de réseau de test.',
+  'issue.list.revokeTitle': 'Révoquer cette attestation ?',
+  'issue.list.revokeText':
+    'Tout vérificateur la verra comme révoquée. Cette action est irréversible.',
+  'vault.add': 'Ajouter',
+  'vault.loading': 'Ouverture de votre coffre…',
+  'vault.deleteTitle': 'Supprimer cet élément ?',
+  'vault.deleteText': '« {name} » sera supprimé de votre coffre. Cette action est irréversible.',
+  'vault.shareHint':
+    'Pour partager un élément, ouvrez le lien qu’un vérificateur vous a envoyé dans',
+  'vault.shareLink': 'Demandes',
+  'request.declared': 'Nom indiqué par le demandeur, non vérifié.',
+  'request.whichHint':
+    'Choisissez, pour chaque information, la valeur à partager ou « Ne pas partager ». Rien d’autre ne quitte votre coffre.',
+  'request.dontShare': 'Ne pas partager',
+  'request.notInVault': 'Absent de votre coffre.',
+  'request.emptyVault':
+    'Votre coffre ne contient aucune des informations demandées. Importez un document qui les contient, puis revenez sur ce lien.',
+  'request.pickOne': 'Choisissez au moins une valeur à partager, ou refusez la demande.',
+  'request.shareSelection': 'Partager ma sélection',
+  'request.refuseAll': 'Refuser la demande',
+  'request.refuseTitle': 'Refuser cette demande ?',
+  'request.refuseText': 'Le demandeur verra votre refus. Rien n’est partagé.',
+  'request.withdrawTitle': 'Retirer votre accord ?',
+  'request.withdrawText':
+    'Le demandeur ne pourra plus télécharger ce que vous avez partagé. Une copie déjà reçue ne peut pas être effacée.',
+  'request.signIn.title': 'Connectez-vous pour répondre',
+  'request.signIn.text':
+    'Consulter cette demande ne nécessite aucun compte. Pour partager une information, connectez-vous avec votre portefeuille : votre coffre s’ouvre dans ce navigateur.',
+  'request.signIn.cta': 'Se connecter pour répondre',
+  'status.title': 'Votre demande',
+  'status.lede':
+    'Envoyez le lien à la personne concernée. Ses réponses s’affichent ici et sont vérifiées dans votre navigateur.',
+  'status.share.title': 'Lien à envoyer',
+  'status.share.text':
+    'Toute personne disposant de ce lien peut lire votre demande, jamais une valeur. Vous seul, dans ce navigateur, pouvez lire les réponses.',
+  'status.answers': 'Réponses',
+  'status.checks': 'Détail des contrôles',
+  'status.expiredOn': 'Expirée le',
+  'status.withdrawnAfter': 'Le titulaire a depuis retiré son accord.',
+  'status.otherBrowser.title': 'Cette demande n’est pas dans ce navigateur',
+  'status.otherBrowser.text':
+    'Seul le navigateur qui a créé une demande peut en lire les réponses. Ouvrez-la depuis celui-ci, ou créez-en une nouvelle.',
+  'status.newRequest': 'Nouvelle demande',
+  'state.pending': 'En attente de réponse',
+  'state.refused': 'Refusée',
+  'state.allowed': 'Envoi en cours',
+  'state.shared': 'Partagée',
+  'state.withdrawn': 'Accord retiré',
+  'state.expired': 'Expirée',
+  'state.answered': 'Déjà répondu',
+  'verify.name': 'Qui demande',
+  'verify.namePlaceholder': 'Admissions Epitech',
+  'verify.nameHint': 'Votre nom ou celui de votre organisation, affiché à la personne sollicitée.',
+  'verify.whatHint': 'Cochez jusqu’à {max} informations. La personne choisit lesquelles partager.',
+  'verify.pickOne': 'Cochez au moins une information.',
+  'verify.tooMany': 'Cochez {max} informations au maximum.',
+  'verify.lifetime': 'Validité',
+  'verify.lifetime.1': '1 heure',
+  'verify.lifetime.24': '24 heures',
+  'verify.lifetime.168': '7 jours',
+  'verify.creating': 'Création de la demande…',
+  'verify.createFailed': 'La demande n’a pas pu être créée. Réessayez.',
+  'verify.noWallet':
+    'Aucun portefeuille ni compte nécessaire. La demande et les clés qui lisent les réponses restent dans ce navigateur.',
+  'verify.mine': 'Vos demandes dans ce navigateur',
+  'verify.until': 'Ouverte jusqu’au {date}',
+  'verify.expiredOn': 'Expirée le {date}',
+  'verify.open': 'Ouvrir',
+  'verify.forget': 'Oublier',
+  'verify.forgetTitle': 'Oublier cette demande ?',
+  'verify.forgetText':
+    'Ses clés sont supprimées de ce navigateur : ses réponses ne pourront plus y être lues.',
+  'verify.shareSheet': 'Partager',
   'wallet.none': 'Aucun portefeuille trouvé. Installez MetaMask ou un autre portefeuille Ethereum.',
   'wallet.cancelled': 'Vous avez annulé la demande dans votre portefeuille.',
   'wallet.otherAccount': 'Votre portefeuille est sur un autre compte que celui de votre connexion.',
@@ -717,6 +910,26 @@ export const messages = { en, fr } as const
  */
 export const errorTranslations: Record<string, string> = {
   // Wallet and sign-in
+  [walletMessages.unauthorized]:
+    'Votre portefeuille n’a pas autorisé ce site pour ce compte. Ouvrez votre portefeuille, connectez ce compte au site, puis réessayez.',
+  [walletMessages.locked]: 'Déverrouillez votre portefeuille, puis réessayez.',
+  [walletMessages.pending]:
+    'Une demande attend déjà dans votre portefeuille. Ouvrez-le pour y répondre.',
+  [walletMessages.wrongChain]:
+    'Passez votre portefeuille sur le réseau Base Sepolia, puis réessayez.',
+  [walletMessages.funds]:
+    'Ce compte n’a pas d’ETH Base Sepolia pour payer les frais de réseau. Obtenez-en auprès d’un faucet.',
+  [walletMessages.network]: 'Le réseau ne répond pas. Vérifiez votre connexion et réessayez.',
+  [walletMessages.issuerExists]: 'Cet identifiant d’organisation est déjà pris. Réessayez.',
+  [walletMessages.notSigner]: 'Ce portefeuille n’est pas le signataire de l’organisation.',
+  [walletMessages.notIssuer]: 'Seule l’organisation qui a émis cette attestation peut la révoquer.',
+  [walletMessages.alreadyAnchored]: 'Cette attestation est déjà inscrite.',
+  [walletMessages.alreadyRevoked]: 'Cette attestation est déjà révoquée.',
+  [walletMessages.invalidValidity]: 'Le registre n’accepte pas ces dates de validité.',
+  [walletMessages.badSignature]:
+    'La signature de l’organisation ne correspond pas à cette attestation.',
+  [walletMessages.unknownIssuer]: 'Cette organisation n’est pas enregistrée sur la blockchain.',
+  [walletMessages.generic]: 'L’opération du portefeuille a échoué. Réessayez.',
   [en['wallet.none']]: fr['wallet.none'],
   [en['wallet.cancelled']]: fr['wallet.cancelled'],
   [en['wallet.otherAccount']]: fr['wallet.otherAccount'],
@@ -789,8 +1002,11 @@ export const errorTranslations: Record<string, string> = {
   'This attribute cannot be requested.': 'Cette information ne peut pas être demandée.',
   'Say why you need it, in 200 characters or less.':
     'Indiquez pourquoi vous en avez besoin, en 200 caractères maximum.',
-  'The request must be valid for one hour at most, starting now.':
-    'La demande doit être valable une heure au plus, à partir de maintenant.',
+  'The request must be valid for seven days at most, starting now.':
+    'La demande doit être valable sept jours au plus, à partir de maintenant.',
+  'Say who is asking, in 80 characters or less.': 'Indiquez qui demande, en 80 caractères maximum.',
+  'Too many open requests right now. Try again later.':
+    'Trop de demandes en cours. Réessayez plus tard.',
   'The request must name an encryption key you registered.':
     'La demande doit désigner une clé de chiffrement que vous avez enregistrée.',
   'The request signature does not match the requester.':

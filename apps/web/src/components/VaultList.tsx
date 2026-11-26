@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { formatClaimValue } from '@/lib/format.ts'
 import { holderStatus } from '@/lib/status.ts'
 
+import { ConfirmButton, ErrorNotice } from './Form.tsx'
 import { useI18n } from './I18nProvider.tsx'
 import { StatusBadge } from './StatusBadge.tsx'
 import { useVault, type VaultItem } from './VaultProvider.tsx'
@@ -61,27 +62,38 @@ function Row({ item }: { item: VaultItem }) {
             {t('vault.hide')}
           </button>
         )}
-        <button
-          type="button"
-          className="button quiet small danger"
+        <ConfirmButton
+          label={t('vault.delete')}
           disabled={state === 'busy'}
-          onClick={() => act(() => remove(item))}
-        >
-          {t('vault.delete')}
-        </button>
+          title={t('vault.deleteTitle')}
+          text={t('vault.deleteText', { name: attr(item.attribute) })}
+          confirmLabel={t('vault.delete')}
+          onConfirm={() => void act(() => remove(item))}
+        />
       </div>
       {state === 'error' && (
-        <p role="alert" className="error item-error">
-          {t('vault.itemError')}
-        </p>
+        <div className="item-error">
+          <ErrorNotice message={t('vault.itemError')} />
+        </div>
       )}
     </li>
   )
 }
 
 export function VaultList() {
-  const { items } = useVault()
+  const { items, ready } = useVault()
   const { t } = useI18n()
+
+  if (!ready) {
+    return (
+      <div className="card" aria-busy="true">
+        <p className="hint loading-line">
+          <span className="spinner" aria-hidden="true" />
+          {t('vault.loading')}
+        </p>
+      </div>
+    )
+  }
 
   if (items.length === 0) {
     return (
@@ -102,14 +114,22 @@ export function VaultList() {
 
   return (
     <div className="vault card">
-      <p className="vault-count">
-        {items.length === 1 ? t('vault.countOne') : t('vault.count', { count: items.length })}
-      </p>
+      <div className="vault-head">
+        <p className="vault-count">
+          {items.length === 1 ? t('vault.countOne') : t('vault.count', { count: items.length })}
+        </p>
+        <Link href="/import" className="button quiet small">
+          {t('vault.add')}
+        </Link>
+      </div>
       <ul className="items">
         {items.map((item) => (
           <Row key={item.reference} item={item} />
         ))}
       </ul>
+      <p className="hint">
+        {t('vault.shareHint')} <Link href="/consent">{t('vault.shareLink')}</Link>
+      </p>
       <p className="hint">{t('vault.keyHint')}</p>
     </div>
   )

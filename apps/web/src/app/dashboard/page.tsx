@@ -1,4 +1,3 @@
-import { AttestationImport } from '@/components/AttestationImport.tsx'
 import { T } from '@/components/I18nProvider.tsx'
 import { PageHead } from '@/components/PageHead.tsx'
 import { StatusLegend } from '@/components/StatusBadge.tsx'
@@ -37,7 +36,6 @@ export default async function DashboardPage() {
       )}
 
       <VaultList />
-      <AttestationImport />
 
       <div className="reference">
         <div>

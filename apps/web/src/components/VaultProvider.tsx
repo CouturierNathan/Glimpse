@@ -7,8 +7,6 @@ import type {
   ExtractedClaim,
   KeyEnvelope,
   ShareGrant,
-  SourceClass,
-  VerificationRequest,
 } from '@glimpse/shared'
 import {
   decryptAttestation,
@@ -34,18 +32,17 @@ import {
   useState,
 } from 'react'
 
+import {
+  deleteLocalVault,
+  loadLocalVault,
+  saveLocalVault,
+  type VaultItem,
+} from '@/lib/vault/local.ts'
+
 import { useIdentity } from './IdentityProvider.tsx'
 import { useSession } from './SessionProvider.tsx'
 
-/** What the browser keeps about a stored item. The server only ever sees its ciphertext. */
-export interface VaultItem {
-  reference: string
-  attribute: string
-  sourceClass: SourceClass
-  /** Creation-time fingerprint of the stored bytes; downloads are checked against it. */
-  digest: string
-  expected: ItemExpectation
-}
+export type { VaultItem }
 
 interface VaultContextValue {
   items: readonly VaultItem[]
@@ -67,10 +64,10 @@ interface VaultContextValue {
   share: (requestId: string, item: VaultItem) => Promise<void>
   refuse: (requestId: string) => Promise<void>
   withdraw: (requestId: string) => Promise<void>
-  /** For the requester: downloads and decrypts what the holder shared. Verification is separate. */
-  receive: (
-    requestId: string,
-  ) => Promise<{ request: VerificationRequest; claim: ExtractedClaim | AttestationRecord }>
+  /** True once the keys and the items kept in this browser are loaded. */
+  ready: boolean
+  /** Signs out and deletes the keys and items this browser kept. */
+  signOut: () => Promise<void>
 }
 
 const json = (body: unknown): RequestInit => ({
@@ -141,13 +138,14 @@ function base64url(bytes: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-/** A fresh encryption key pair bound to the holder; the private key cannot be exported. */
-async function createIdentity(): Promise<EncryptionIdentity> {
+async function holderId(): Promise<string> {
   const res = await fetch('/api/vault/holder')
   if (!res.ok) throw await failure(res)
-  const { holderId } = (await res.json()) as { holderId: string }
+  return ((await res.json()) as { holderId: string }).holderId
+}
 
-  const identity = await generateEncryptionKeys(holderId)
+/** Tells the server this browser's public key; the same key again is harmless. */
+async function register(identity: EncryptionIdentity): Promise<void> {
   const publicKey = base64url(await crypto.subtle.exportKey('spki', identity.publicKey))
   const registered = await fetch('/api/vault/keys', {
     method: 'POST',
@@ -155,32 +153,87 @@ async function createIdentity(): Promise<EncryptionIdentity> {
     body: JSON.stringify({ recipientKeyId: identity.recipientKeyId, publicKey }),
   })
   if (!registered.ok) throw await failure(registered)
-  return identity
 }
 
 /**
- * Holds the holder's encryption keys and the list of stored items, in memory only. Nothing here
- * reaches localStorage: reloading the page drops the keys, and with them access to these items.
+ * Holds the holder's encryption keys and the list of stored items. They are kept in this browser
+ * (lib/vault/local.ts), so a reload or a request link opened in another tab finds the vault; the
+ * private key cannot be exported and never leaves the browser. Signing out deletes them.
  */
 export function VaultProvider({ children }: { children: ReactNode }) {
-  const { address, signOut } = useSession()
+  const { address, signOut: endSession } = useSession()
   const { refresh: refreshIdentity } = useIdentity()
   const [items, setItems] = useState<VaultItem[]>([])
+  const [ready, setReady] = useState(false)
   const identity = useRef<Promise<EncryptionIdentity> | null>(null)
+  const holder = useRef<string | null>(null)
 
-  // Another wallet, or a sign-out, must not inherit the previous holder's keys or items.
-  useEffect(() => {
-    identity.current = null
-    setItems([])
-  }, [address])
-
+  /**
+   * This browser's keys for the signed-in wallet: the ones kept from before when the server still
+   * knows the same holder, else a fresh pair. Either way the server learns the public key.
+   */
   const keys = useCallback((): Promise<EncryptionIdentity> => {
-    identity.current ??= createIdentity().catch((error: unknown) => {
+    identity.current ??= (async () => {
+      if (!address) {
+        throw new VaultError('Your session has ended. Sign in again.', 401, 'SIGNED_OUT')
+      }
+      const id = await holderId()
+      const kept = await loadLocalVault(address)
+      const reuse = kept?.holderId === id ? kept.identity : null
+      const current = reuse ?? (await generateEncryptionKeys(id))
+      await register(current)
+      holder.current = id
+      if (!reuse) {
+        await saveLocalVault({ wallet: address, holderId: id, identity: current, items: [] })
+      }
+      return current
+    })().catch((error: unknown) => {
       identity.current = null
       throw error
     })
     return identity.current
-  }, [])
+  }, [address])
+
+  // Another wallet, or a sign-out, must not inherit the previous holder's keys or items. The
+  // signed-in wallet gets back what this browser kept for it.
+  useEffect(() => {
+    identity.current = null
+    holder.current = null
+    setItems([])
+    setReady(false)
+    if (!address) return
+    let cancelled = false
+    void (async () => {
+      const kept = await loadLocalVault(address)
+      if (kept && !cancelled) {
+        try {
+          await keys()
+          if (!cancelled && holder.current === kept.holderId) setItems(kept.items)
+        } catch {
+          // Signed out or server unreachable: the screens say so on the next vault call.
+        }
+      }
+      if (!cancelled) setReady(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [address, keys])
+
+  // The item list follows every change, so another tab or a reload sees the same vault.
+  useEffect(() => {
+    if (!address || !ready || !holder.current) return
+    const holderId = holder.current
+    void identity.current?.then((current) =>
+      saveLocalVault({ wallet: address, holderId, identity: current, items }),
+    )
+  }, [address, ready, items])
+
+  /** Signs out and deletes what this browser kept of the vault. */
+  const signOut = useCallback(async () => {
+    if (address) await deleteLocalVault(address)
+    await endSession()
+  }, [address, endSession])
 
   const request = useCallback(
     async (url: string, init?: RequestInit): Promise<Response> => {
@@ -195,12 +248,12 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       const error = await failure(res)
       // The server session is gone: drop the client one too, so the sign-in page asks again
       // instead of sending the user straight back here.
-      if (error.code === 'SIGNED_OUT') await signOut()
+      if (error.code === 'SIGNED_OUT') await endSession()
       // The server forgot the identity (a restart): lock the screens that need it again.
       if (error.code === 'IDENTITY_REQUIRED') await refreshIdentity()
       throw error
     },
-    [keys, signOut, refreshIdentity],
+    [keys, endSession, refreshIdentity],
   )
 
   const save = useCallback(
@@ -330,25 +383,6 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     [request],
   )
 
-  const receive = useCallback(
-    async (requestId: string) => {
-      const me = await keys()
-      const res = await request(`/api/requests/${requestId}/share`)
-      const shared = (await res.json()) as {
-        record: EncryptedRecord
-        envelope: KeyEnvelope
-        expected: ItemExpectation
-        request: VerificationRequest
-      }
-      if (shared.envelope.recipientKeyId !== me.recipientKeyId) {
-        throw new Error('This request was made before the page was reloaded. Create a new one.')
-      }
-      const claim = await decrypt(shared.record, shared.envelope, me, shared.expected)
-      return { request: shared.request, claim }
-    },
-    [keys, request],
-  )
-
   return (
     <VaultContext
       value={{
@@ -362,7 +396,8 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         share,
         refuse,
         withdraw,
-        receive,
+        ready,
+        signOut,
       }}
     >
       {children}

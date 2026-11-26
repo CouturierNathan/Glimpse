@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, useId, useRef, useState } from 'react'
 
+import { FieldError } from './Form.tsx'
 import { useI18n } from './I18nProvider.tsx'
 
 interface FilePickerProps {
@@ -15,6 +16,10 @@ interface FilePickerProps {
   buttonLabel?: string
   /** Called with the chosen file. The input is cleared after it returns. */
   onPick?: (file: File) => void
+  /** Called with the chosen file, which stays in the form. */
+  onSelect?: (file: File | null) => void
+  /** Validation message under the field. */
+  error?: string
 }
 
 /**
@@ -34,6 +39,8 @@ export function FilePicker({
   disabled,
   buttonLabel,
   onPick,
+  onSelect,
+  error,
 }: FilePickerProps) {
   const { t } = useI18n()
   const id = useId()
@@ -43,6 +50,7 @@ export function FilePicker({
   function onChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0]
     setChosen(file?.name ?? null)
+    onSelect?.(file ?? null)
     if (file && onPick) {
       onPick(file)
       event.currentTarget.value = ''
@@ -65,7 +73,11 @@ export function FilePicker({
         aria-hidden="true"
         onChange={onChange}
       />
-      <div className="file-drop" data-chosen={chosen ? '' : undefined}>
+      <div
+        className="file-drop"
+        data-chosen={chosen ? '' : undefined}
+        data-invalid={error ? '' : undefined}
+      >
         <svg viewBox="0 0 24 24" aria-hidden="true" className="file-icon">
           <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
           <path d="M14 3v5h5" />
@@ -78,12 +90,16 @@ export function FilePicker({
           className="button quiet small"
           disabled={disabled}
           aria-label={t('file.aria', { label })}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${name}-error` : undefined}
+          data-field={name}
           onClick={() => input.current?.click()}
         >
           {buttonLabel ?? t('file.choose')}
         </button>
       </div>
       {hint && <span className="hint">{hint}</span>}
+      <FieldError name={name} message={error} />
     </div>
   )
 }

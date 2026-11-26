@@ -78,3 +78,25 @@ test('the language comes from the saved choice, then the browser, then French', 
     'Choisissez au plus 16 informations par document.',
   )
 })
+
+// A field named like a form property (`attributes`, `action`…) replaces that property in the DOM:
+// React then reports a hydration mismatch and form handling breaks.
+test('no form field shadows a property of its form', () => {
+  const reserved = [
+    'attributes',
+    'action',
+    'method',
+    'elements',
+    'length',
+    'submit',
+    'reset',
+    'id',
+    'name',
+    'target',
+  ]
+  for (const file of sources(src).filter((f) => f.endsWith('.tsx'))) {
+    for (const match of readFileSync(file, 'utf8').matchAll(/\bname="([a-zA-Z]+)"/g)) {
+      assert.ok(!reserved.includes(match[1] ?? ''), `${file.slice(src.length)}: name="${match[1]}"`)
+    }
+  }
+})
