@@ -9,13 +9,14 @@ type ClaimValue =
   | { type: 'boolean'; value: boolean }
   | { type: 'date'; value: string }
 
-/** A claim value as the holder reads it: `Yes` rather than `true`. */
-export function formatClaimValue(value: ClaimValue): string {
+/** A claim value as the holder reads it: `Yes` (or `Oui`) rather than `true`. */
+export function formatClaimValue(value: ClaimValue, locale: 'en' | 'fr' = 'en'): string {
   switch (value.type) {
     case 'boolean':
+      if (locale === 'fr') return value.value ? 'Oui' : 'Non'
       return value.value ? 'Yes' : 'No'
     case 'number':
-      return value.value.toLocaleString('en')
+      return value.value.toLocaleString(locale)
     case 'date':
     case 'string':
       return value.value

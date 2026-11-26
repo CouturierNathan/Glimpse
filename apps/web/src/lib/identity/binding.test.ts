@@ -52,11 +52,13 @@ test('only the bound wallet signature verifies against the rebuilt message', asy
   )
 })
 
+const name = { surname: ['s'], givenNames: ['g'] }
+
 test('a report is bound once, by its holder, only if it passed', () => {
   const store = new IdentityReportStore()
   const signature = `0x${'1'.repeat(130)}` as const
-  store.add('e'.repeat(32), passed)
-  store.add('e'.repeat(32), failed)
+  store.add('e'.repeat(32), passed, name)
+  store.add('e'.repeat(32), failed, name)
   assert.equal(store.get('f'.repeat(32), passed.reportId), null)
   assert.throws(() => store.bind('f'.repeat(32), passed.reportId, holder.address, signature))
   assert.throws(() => store.bind('e'.repeat(32), failed.reportId, holder.address, signature))
@@ -66,4 +68,23 @@ test('a report is bound once, by its holder, only if it passed', () => {
     signature,
   })
   assert.throws(() => store.bind('e'.repeat(32), passed.reportId, holder.address, signature))
+})
+
+test('the identity is verified only once a passed proof with a readable name is bound', () => {
+  const store = new IdentityReportStore()
+  const holderId = 'e'.repeat(32)
+  const signature = `0x${'1'.repeat(130)}` as const
+  assert.equal(store.verified(holderId), null)
+  assert.throws(() => store.requireVerified(holderId), { code: 'IDENTITY_REQUIRED', status: 403 })
+
+  const unnamed = { ...passed, reportId: 'c'.repeat(32) }
+  store.add(holderId, unnamed)
+  assert.throws(() => store.bind(holderId, unnamed.reportId, holder.address, signature), {
+    status: 422,
+  })
+  store.add(holderId, passed, name)
+  assert.equal(store.verified(holderId), null, 'checked but not bound yet')
+  store.bind(holderId, passed.reportId, holder.address, signature)
+  assert.deepEqual(store.requireVerified(holderId).name, name)
+  assert.equal(store.verified('f'.repeat(32)), null, "another holder's proof does not count")
 })

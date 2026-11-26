@@ -2,6 +2,8 @@
 
 import { type ChangeEvent, useId, useRef, useState } from 'react'
 
+import { useI18n } from './I18nProvider.tsx'
+
 interface FilePickerProps {
   /** Form field name, so a surrounding form reads the file from its FormData. */
   name: string
@@ -30,9 +32,10 @@ export function FilePicker({
   label,
   hint,
   disabled,
-  buttonLabel = 'Choose a file',
+  buttonLabel,
   onPick,
 }: FilePickerProps) {
+  const { t } = useI18n()
   const id = useId()
   const input = useRef<HTMLInputElement>(null)
   const [chosen, setChosen] = useState<string | null>(null)
@@ -62,19 +65,23 @@ export function FilePicker({
         aria-hidden="true"
         onChange={onChange}
       />
-      <div className="file-row">
+      <div className="file-drop" data-chosen={chosen ? '' : undefined}>
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="file-icon">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+          <path d="M14 3v5h5" />
+        </svg>
+        <span className="file-name" aria-live="polite">
+          {chosen ?? t('file.none')}
+        </span>
         <button
           type="button"
-          className="button quiet"
+          className="button quiet small"
           disabled={disabled}
-          aria-label={`${label}: choose a file`}
+          aria-label={t('file.aria', { label })}
           onClick={() => input.current?.click()}
         >
-          {buttonLabel}
+          {buttonLabel ?? t('file.choose')}
         </button>
-        <span className="file-name" aria-live="polite">
-          {chosen ?? 'No file chosen'}
-        </span>
       </div>
       {hint && <span className="hint">{hint}</span>}
     </div>

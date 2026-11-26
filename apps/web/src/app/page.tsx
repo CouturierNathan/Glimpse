@@ -1,69 +1,85 @@
-import Link from 'next/link'
-
+import { HomeCta } from '@/components/HomeCta.tsx'
+import { T } from '@/components/I18nProvider.tsx'
 import { StatusBadge } from '@/components/StatusBadge.tsx'
+import type { MessageKey } from '@/lib/i18n/messages.ts'
 
 /** Every line of the attestation stays masked except the one the requester asked for. */
-const hiddenRows = [
-  { label: 'Full name', width: '72%' },
-  { label: 'Date of birth', width: '44%' },
-  { label: 'Home address', width: '88%' },
+const hiddenRows: { label: MessageKey; width: string }[] = [
+  { label: 'home.doc.fullName', width: '72%' },
+  { label: 'home.doc.birth', width: '44%' },
+  { label: 'home.doc.address', width: '88%' },
 ]
+
+const steps = [
+  { title: 'home.step1.title', text: 'home.step1.text' },
+  { title: 'home.step2.title', text: 'home.step2.text' },
+  { title: 'home.step3.title', text: 'home.step3.text' },
+] as const satisfies { title: MessageKey; text: MessageKey }[]
 
 export default function HomePage() {
   return (
     <>
       <section className="hero">
         <div>
-          <h1>Reveal less. Prove more.</h1>
+          <h1>
+            <T k="home.title" />
+          </h1>
           <p className="lede">
-            Glimpse is an encrypted vault of personal attestations. You hold the keys, and you share
-            one attribute at a time, only when you agree.
+            <T k="home.lede" />
           </p>
-          <Link href="/login" className="button">
-            Sign in with Ethereum
-          </Link>
+          <HomeCta />
         </div>
 
-        <figure className="doc" aria-label="Example: an attestation where only one line is shared">
+        <figure className="doc" aria-labelledby="doc-title">
           <div className="doc-head">
-            <h2>Identity attestation</h2>
-            <span>Shared with a requester</span>
+            <h2 id="doc-title">
+              <T k="home.doc.title" />
+            </h2>
+            <span>
+              <T k="home.doc.shared" />
+            </span>
           </div>
           <dl>
             {hiddenRows.map((row) => (
               <div className="doc-row" key={row.label}>
-                <dt>{row.label}</dt>
+                <dt>
+                  <T k={row.label} />
+                </dt>
                 <dd>
                   <span className="redacted" style={{ width: row.width }} />
-                  <span className="sr-only">hidden</span>
+                  <span className="sr-only">
+                    <T k="home.doc.hidden" />
+                  </span>
                 </dd>
               </div>
             ))}
             <div className="doc-row revealed">
-              <dt>Over 18</dt>
-              <dd>Yes</dd>
+              <dt>
+                <T k="home.doc.over18" />
+              </dt>
+              <dd>
+                <T k="common.yes" />
+              </dd>
             </div>
           </dl>
           <figcaption className="doc-foot">
             <StatusBadge status="authentic" />
-            Signed by the issuer, checked on chain by the requester.
+            <T k="home.doc.foot" />
           </figcaption>
         </figure>
       </section>
 
       <ol className="steps">
-        <li>
-          <h2>An organisation signs</h2>
-          <p>Your bank, school or employer attests a fact about you and anchors it on chain.</p>
-        </li>
-        <li>
-          <h2>You keep it encrypted</h2>
-          <p>The attestation lands in your vault. Only your wallet holds the key that opens it.</p>
-        </li>
-        <li>
-          <h2>You share one line</h2>
-          <p>A requester asks for one attribute. You agree, and they verify it on their own.</p>
-        </li>
+        {steps.map((step) => (
+          <li key={step.title}>
+            <h2>
+              <T k={step.title} />
+            </h2>
+            <p>
+              <T k={step.text} />
+            </p>
+          </li>
+        ))}
       </ol>
     </>
   )

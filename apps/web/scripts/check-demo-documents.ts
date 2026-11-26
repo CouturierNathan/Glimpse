@@ -1,5 +1,5 @@
 /*
- * Reads every demo document in public/demo/ with the real extractor and the real attribute list,
+ * Reads every demo document in tests/fixtures/documents/ with the real extractor and the real attribute list,
  * so a label that no longer matches, or a line the extractor refuses, is caught here rather than
  * in front of an audience. Run: npm run check:demo -w apps/web
  */
@@ -14,12 +14,16 @@ const documents = [
   { file: 'demo-complete-record.txt', kind: 'synthetic' },
   { file: 'demo-student-certificate.txt', kind: 'education' },
   { file: 'demo-employment-certificate.txt', kind: 'employment' },
+  { file: 'demo-other-person-certificate.txt', kind: 'synthetic' },
 ] as const
 
 let failures = 0
 
 for (const { file, kind } of documents) {
-  const text = await readFile(new URL(`../public/demo/${file}`, import.meta.url), 'utf8')
+  const text = await readFile(
+    new URL(`../../../tests/fixtures/documents/${file}`, import.meta.url),
+    'utf8',
+  )
   // Only the attributes this document actually carries, capped like the import screen caps them.
   const present = importAttributes.filter((a) => new RegExp(`^${a.label}\\s*:`, 'im').test(text))
   const specs: AttributeSpec[] = present

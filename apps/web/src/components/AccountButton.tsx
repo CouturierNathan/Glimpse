@@ -5,10 +5,12 @@ import { usePathname, useRouter } from 'next/navigation'
 
 import { shortAddress } from '@/lib/format.ts'
 
+import { useI18n } from './I18nProvider.tsx'
 import { useSession } from './SessionProvider.tsx'
 
 export function AccountButton() {
   const { status, address, signOut } = useSession()
+  const { t } = useI18n()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -18,26 +20,29 @@ export function AccountButton() {
     if (pathname === '/login') return <span className="account" />
 
     return (
-      <Link href="/login" className="button account">
-        Sign in
-      </Link>
+      <span className="account">
+        <Link href="/login" className="button small">
+          {t('account.signIn')}
+        </Link>
+      </span>
     )
   }
 
   return (
     <span className="account">
-      <span className="address" title={address}>
+      <span className="address" title={t('account.address', { address })}>
+        <span className="dot" aria-hidden="true" />
         {shortAddress(address)}
       </span>
       <button
         type="button"
-        className="button quiet"
+        className="button quiet small"
         onClick={async () => {
           await signOut()
           router.push('/')
         }}
       >
-        Sign out
+        {t('account.signOut')}
       </button>
     </span>
   )

@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { formatClaimValue, shortAddress } from '@/lib/format.ts'
+import type { MessageKey } from '@/lib/i18n/messages.ts'
 import { holderStatus } from '@/lib/status.ts'
-import { attributeName } from '@/lib/vault/attributes.ts'
 
+import { useI18n } from './I18nProvider.tsx'
 import { StatusBadge } from './StatusBadge.tsx'
 import { useVault } from './VaultProvider.tsx'
 
@@ -20,20 +21,23 @@ interface RequestView {
   state: 'pending' | 'refused' | 'allowed' | 'shared' | 'withdrawn' | 'expired' | 'answered'
 }
 
-const closedCopy: Record<string, string> = {
-  refused: 'You refused this request.',
-  withdrawn: 'You withdrew your consent. The requester can no longer download the item.',
-  expired: 'This request has expired. Ask the requester for a new link.',
-  answered: 'Someone already answered this request.',
+const closedCopy: Record<string, MessageKey> = {
+  refused: 'request.closed.refused',
+  withdrawn: 'request.closed.withdrawn',
+  expired: 'request.closed.expired',
+  answered: 'request.closed.answered',
 }
 
 export function RequestReview({ requestId }: { requestId: string }) {
   const { items, request, open, share, refuse, withdraw } = useVault()
+  const { t, attr, error: te, date, locale } = useI18n()
   const [view, setView] = useState<RequestView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [chosen, setChosen] = useState<string | null>(null)
-  const [preview, setPreview] = useState<Record<string, string>>({})
+  const [preview, setPreview] = useState<
+    Record<string, Parameters<typeof formatClaimValue>[0] | 'error'>
+  >({})
   const started = useRef(new Set<string>())
 
   const load = useCallback(async () => {
@@ -41,7 +45,7 @@ export function RequestReview({ requestId }: { requestId: string }) {
       const res = await request(`/api/requests/${requestId}`)
       setView((await res.json()) as RequestView)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'This request could not be loaded.')
+      setError(e instanceof Error ? e.message : 'request.loadFailed')
     }
   }, [request, requestId])
 
@@ -57,10 +61,8 @@ export function RequestReview({ requestId }: { requestId: string }) {
       if (started.current.has(item.reference)) continue
       started.current.add(item.reference)
       open(item)
-        .then((claim) =>
-          setPreview((p) => ({ ...p, [item.reference]: formatClaimValue(claim.value) })),
-        )
-        .catch(() => setPreview((p) => ({ ...p, [item.reference]: 'Cannot be opened' })))
+        .then((claim) => setPreview((p) => ({ ...p, [item.reference]: claim.value })))
+        .catch(() => setPreview((p) => ({ ...p, [item.reference]: 'error' })))
     }
   }, [matching, open])
 
@@ -71,7 +73,7 @@ export function RequestReview({ requestId }: { requestId: string }) {
       await action()
       await load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'That did not work, try again.')
+      setError(e instanceof Error ? e.message : t('request.failed'))
     } finally {
       setBusy(false)
     }
@@ -80,41 +82,53 @@ export function RequestReview({ requestId }: { requestId: string }) {
   if (!view) {
     return error ? (
       <p role="alert" className="error">
-        {error}
+        {error === 'request.loadFailed' ? t('request.loadFailed') : te(error)}
       </p>
     ) : (
-      <p className="hint">Loading the request…</p>
+      <div className="card request-review" aria-busy="true">
+        <p className="hint loading-line">
+          <span className="spinner" aria-hidden="true" />
+          {t('request.loading')}
+        </p>
+      </div>
     )
   }
 
-  const name = attributeName(view.attribute)
+  const name = attr(view.attribute)
+  const closed = closedCopy[view.state]
+  const shown = (reference: string) => {
+    const value = preview[reference]
+    if (value === undefined) return t('request.decrypting')
+    if (value === 'error') return t('request.cannotOpen')
+    return formatClaimValue(value, locale)
+  }
   const item = matching.find((i) => i.reference === chosen)
 
   return (
-    <div className="panel request-review">
+    <div className="card request-review">
       <dl className="request-facts">
         <div>
-          <dt>Requester</dt>
+          <dt>{t('request.requester')}</dt>
           <dd>
             <span className="address" title={view.requester}>
               {shortAddress(view.requester)}
             </span>
-            {view.role === 'requester' && <span className="hint"> (you)</span>}
+            {view.role === 'requester' && <span className="hint"> {t('common.you')}</span>}
           </dd>
         </div>
         <div>
-          <dt>Asks for</dt>
+          <dt>{t('request.asksFor')}</dt>
           <dd>
-            <strong>{name}</strong>, and nothing else
+            <strong>{t('request.nothingElse', { name })}</strong>
           </dd>
         </div>
         <div>
-          <dt>Because</dt>
+          <dt>{t('request.because')}</dt>
           <dd className="purpose">{view.purpose}</dd>
         </div>
         <div>
-          <dt>Answer before</dt>
-          <dd>{new Date(view.expiresAt).toLocaleString()}</dd>
+          <dt>{t('request.before')}</dt>
+          <dd>{date(view.expiresAt, { dateStyle: 'medium', timeStyle: 'short' })}</dd>
         </div>
       </dl>
 
@@ -122,17 +136,14 @@ export function RequestReview({ requestId }: { requestId: string }) {
         <>
           {matching.length === 0 ? (
             <div className="empty-inline">
-              <p>
-                Your vault has no {name.toLowerCase()} in this browser. Import a document that
-                contains it, then come back to this link.
-              </p>
+              <p>{t('request.noMatch', { name })}</p>
               <Link href="/import" className="button quiet">
-                Import a document
+                {t('request.importCta')}
               </Link>
             </div>
           ) : (
             <fieldset className="field choices">
-              <legend>Which one to share</legend>
+              <legend>{t('request.which')}</legend>
               {matching.map((i) => (
                 <label key={i.reference} className="check choice">
                   <input
@@ -142,16 +153,13 @@ export function RequestReview({ requestId }: { requestId: string }) {
                     checked={chosen === i.reference}
                     onChange={() => setChosen(i.reference)}
                   />
-                  <span>{preview[i.reference] ?? 'Decrypting…'}</span>
+                  <span>{shown(i.reference)}</span>
                   <StatusBadge status={holderStatus(i.sourceClass)} />
                 </label>
               ))}
             </fieldset>
           )}
-          <p className="hint">
-            Sharing re-encrypts this one value for the requester&apos;s key, in your browser. The
-            requester then checks it on its own and sees its status.
-          </p>
+          <p className="hint">{t('request.shareHint')}</p>
           <div className="actions">
             <button
               type="button"
@@ -159,7 +167,7 @@ export function RequestReview({ requestId }: { requestId: string }) {
               disabled={busy || !item}
               onClick={() => item && act(() => share(view.requestId, item))}
             >
-              {busy ? 'Sharing…' : `Share ${name.toLowerCase()}`}
+              {busy ? t('request.sharing') : t('request.share')}
             </button>
             <button
               type="button"
@@ -167,7 +175,7 @@ export function RequestReview({ requestId }: { requestId: string }) {
               disabled={busy}
               onClick={() => act(() => refuse(view.requestId))}
             >
-              Refuse
+              {t('request.refuse')}
             </button>
           </div>
         </>
@@ -175,15 +183,8 @@ export function RequestReview({ requestId }: { requestId: string }) {
 
       {(view.state === 'shared' || view.state === 'allowed') && (
         <div className="outcome">
-          <h2>
-            {view.state === 'shared'
-              ? `You shared your ${name.toLowerCase()}`
-              : 'Your consent is recorded, but nothing was sent yet'}
-          </h2>
-          <p className="hint">
-            You can withdraw until the requester downloads it. Withdrawing cannot erase a copy they
-            already received.
-          </p>
+          <h2>{view.state === 'shared' ? t('request.shared', { name }) : t('request.allowed')}</h2>
+          <p className="hint">{t('request.withdrawHint')}</p>
           <div className="actions">
             <button
               type="button"
@@ -191,17 +192,17 @@ export function RequestReview({ requestId }: { requestId: string }) {
               disabled={busy}
               onClick={() => act(() => withdraw(view.requestId))}
             >
-              Withdraw consent
+              {t('request.withdraw')}
             </button>
           </div>
         </div>
       )}
 
-      {closedCopy[view.state] && <p className="outcome">{closedCopy[view.state]}</p>}
+      {closed && <p className="outcome">{t(closed)}</p>}
 
       {error && (
         <p role="alert" className="error">
-          {error}
+          {te(error)}
         </p>
       )}
     </div>

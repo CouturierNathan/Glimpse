@@ -5,21 +5,21 @@ import { generateOpaqueId } from '@glimpse/vault'
 import Link from 'next/link'
 import { type FormEvent, useState } from 'react'
 
+import type { MessageKey } from '@/lib/i18n/messages.ts'
+import { formatClaimValue } from '@/lib/format.ts'
+import { holderStatus } from '@/lib/status.ts'
 import {
   attributeCategories,
-  attributeName,
   attributesOf,
-  documentKinds,
-  type DocumentKind,
+  IMPORT_DOCUMENT_KIND,
   MAX_ATTRIBUTES_PER_IMPORT,
+  NAME_ATTRIBUTE,
   uploadMediaType,
 } from '@/lib/vault/attributes.ts'
-import { formatClaimValue } from '@/lib/format.ts'
 import { rawClaimValue, reviewClaim } from '@/lib/vault/review.ts'
-import { holderStatus } from '@/lib/status.ts'
 
-import { DemoDocuments } from './DemoDocuments.tsx'
 import { FilePicker } from './FilePicker.tsx'
+import { useI18n } from './I18nProvider.tsx'
 import { StatusBadge } from './StatusBadge.tsx'
 import { useVault, VaultError } from './VaultProvider.tsx'
 
@@ -35,10 +35,11 @@ type Step =
     }
   | { name: 'encrypting' }
   | { name: 'done'; stored: ExtractedClaim[]; missing: string[]; signed: boolean }
-  | { name: 'error'; message: string; signedOut: boolean }
+  | { name: 'error'; message: string; code?: string }
 
 export function ImportPanel() {
   const { request, store } = useVault()
+  const { t, attr, error: te, locale } = useI18n()
   const post = (url: string, init: RequestInit) => request(url, { method: 'POST', ...init })
   const [step, setStep] = useState<Step>({ name: 'idle' })
   const busy = step.name === 'reading' || step.name === 'encrypting'
@@ -47,29 +48,29 @@ export function ImportPanel() {
     event.preventDefault()
     const fields = new FormData(event.currentTarget)
     const file = fields.get('file')
-    const attributes = fields.getAll('attributes').map(String)
+    // The name is always read: the server matches it with the verified identity.
+    const attributes = [NAME_ATTRIBUTE, ...fields.getAll('attributes').map(String)]
     // The file control is off screen, so the browser cannot show a validation bubble on it.
     if (!(file instanceof File) || file.size === 0) {
-      setStep({ name: 'error', message: 'Choose a document first.', signedOut: false })
-      return
-    }
-    if (attributes.length === 0) {
-      setStep({ name: 'error', message: 'Tick at least one attribute to read.', signedOut: false })
+      setStep({ name: 'error', message: t('import.chooseFirst') })
       return
     }
     if (attributes.length > MAX_ATTRIBUTES_PER_IMPORT) {
       setStep({
         name: 'error',
-        message: `Choose at most ${MAX_ATTRIBUTES_PER_IMPORT} attributes for one document.`,
-        signedOut: false,
+        message: t('import.tooMany', { max: MAX_ATTRIBUTES_PER_IMPORT }),
       })
+      return
+    }
+    if (fields.get('consent') !== 'on') {
+      setStep({ name: 'error', message: t('import.consentRequired') })
       return
     }
     const upload: DocumentUploadRequest = {
       schemaVersion: '1.0.0',
       documentId: generateOpaqueId(),
       documentVersion: 1,
-      kind: String(fields.get('kind')) as DocumentKind,
+      kind: IMPORT_DOCUMENT_KIND,
       mediaType: uploadMediaType(file),
       attributes,
     }
@@ -116,8 +117,8 @@ export function ImportPanel() {
   function fail(error: unknown) {
     setStep({
       name: 'error',
-      message: error instanceof Error ? error.message : 'Import failed, try again.',
-      signedOut: error instanceof VaultError && error.code === 'SIGNED_OUT',
+      message: error instanceof Error ? error.message : t('import.failed'),
+      code: error instanceof VaultError ? error.code : undefined,
     })
   }
 
@@ -130,9 +131,14 @@ export function ImportPanel() {
     try {
       reviewed = step.claims
         .filter((c) => fields.get(`keep-${c.claimId}`) === 'on')
-        .map((c) => reviewClaim(c, String(fields.get(`value-${c.claimId}`))))
-    } catch (error) {
-      setStep({ ...step, error: error instanceof Error ? error.message : 'Check the values.' })
+        .map((c) =>
+          // The name was matched with the identity as read: it is kept as read, or dropped.
+          c.attribute === NAME_ATTRIBUTE
+            ? c
+            : reviewClaim(c, String(fields.get(`value-${c.claimId}`))),
+        )
+    } catch {
+      setStep({ ...step, error: t('import.review.checkValues') })
       return
     }
     const { source, missing } = step
@@ -154,60 +160,71 @@ export function ImportPanel() {
     }
   }
 
+  const missingLine = (missing: string[]) =>
+    missing.length > 0 && (
+      <p className="hint">{t('import.review.missing', { list: missing.map(attr).join(', ') })}</p>
+    )
+
   if (step.name === 'review') {
     return (
-      <form className="panel form" onSubmit={onConfirm}>
-        <h2>Check what was read</h2>
-        <p className="hint">
-          Correct a value or untick it before anything is encrypted. A value you change is stored as
-          your own declaration, not as read from a signed document.
+      <form className="card form" onSubmit={onConfirm}>
+        <h3>{t('import.review.title')}</h3>
+        <p className="success-line">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="m3.5 8.5 3 3 6-7" />
+          </svg>
+          {t('import.review.nameMatched')}
         </p>
-        {step.claims.length === 0 && <p>No requested attribute was found in this document.</p>}
-        {step.claims.map((claim) => (
-          <fieldset key={claim.claimId} className="field">
-            <legend>{attributeName(claim.attribute)}</legend>
-            <label className="check">
-              <input type="checkbox" name={`keep-${claim.claimId}`} defaultChecked />
-              Keep this value
-            </label>
-            {claim.value.type === 'boolean' ? (
-              <select
-                name={`value-${claim.claimId}`}
-                defaultValue={rawClaimValue(claim.value)}
-                aria-label={`${attributeName(claim.attribute)} value`}
-              >
-                <option value="true">Yes</option>
-                <option value="false">No</option>
-              </select>
-            ) : (
-              <input
-                name={`value-${claim.claimId}`}
-                type={
-                  claim.value.type === 'number'
-                    ? 'number'
-                    : claim.value.type === 'date'
-                      ? 'date'
-                      : 'text'
-                }
-                step={claim.value.type === 'number' ? 'any' : undefined}
-                defaultValue={rawClaimValue(claim.value)}
-                aria-label={`${attributeName(claim.attribute)} value`}
-                required
-              />
-            )}
-          </fieldset>
-        ))}
-        {step.missing.length > 0 && (
-          <p className="hint">
-            Not found in this document: {step.missing.map(attributeName).join(', ')}.
-          </p>
-        )}
+        <p className="hint">{t('import.review.hint')}</p>
+        {step.claims.length === 0 && <p>{t('import.review.none')}</p>}
+        <div className="review-list">
+          {step.claims.map((claim) => {
+            const label = t('import.review.value', { name: attr(claim.attribute) })
+            const locked = claim.attribute === NAME_ATTRIBUTE
+            return (
+              <fieldset key={claim.claimId} className="review-item">
+                <legend>{attr(claim.attribute)}</legend>
+                {claim.value.type === 'boolean' ? (
+                  <select
+                    name={`value-${claim.claimId}`}
+                    defaultValue={rawClaimValue(claim.value)}
+                    aria-label={label}
+                  >
+                    <option value="true">{t('common.yes')}</option>
+                    <option value="false">{t('common.no')}</option>
+                  </select>
+                ) : (
+                  <input
+                    name={`value-${claim.claimId}`}
+                    type={
+                      claim.value.type === 'number'
+                        ? 'number'
+                        : claim.value.type === 'date'
+                          ? 'date'
+                          : 'text'
+                    }
+                    step={claim.value.type === 'number' ? 'any' : undefined}
+                    defaultValue={rawClaimValue(claim.value)}
+                    aria-label={label}
+                    readOnly={locked}
+                    required
+                  />
+                )}
+                <label className="check">
+                  <input type="checkbox" name={`keep-${claim.claimId}`} defaultChecked />
+                  {t('import.review.keep')}
+                </label>
+              </fieldset>
+            )
+          })}
+        </div>
+        {missingLine(step.missing)}
         <div className="actions">
           <button type="submit" className="button">
-            Encrypt and add to my vault
+            {t('import.review.confirm')}
           </button>
           <button type="button" className="button quiet" onClick={() => setStep({ name: 'idle' })}>
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
         {step.error && (
@@ -221,90 +238,82 @@ export function ImportPanel() {
 
   if (step.name === 'done') {
     return (
-      <div className="panel import-result" role="status">
-        <h2>
+      <div className="card result" role="status">
+        <h3>
           {step.stored.length === 1
-            ? '1 attribute added to your vault'
-            : `${step.stored.length} attributes added to your vault`}
-        </h2>
+            ? t('import.done.one')
+            : t('import.done.many', { count: step.stored.length })}
+        </h3>
         <ul className="claims">
           {step.stored.map((claim) => (
             <li key={claim.claimId}>
-              <span>{attributeName(claim.attribute)}</span>
+              <span>{attr(claim.attribute)}</span>
               <StatusBadge status={holderStatus(claim.document.provenance.class)} />
-              <strong>{formatClaimValue(claim.value)}</strong>
+              <strong>{formatClaimValue(claim.value, locale)}</strong>
             </li>
           ))}
         </ul>
-        {step.signed && (
-          <p className="hint">
-            The document&apos;s signature was verified against a trusted authority: the values you
-            kept unchanged are marked as coming from a signed document.
-          </p>
-        )}
-        {step.missing.length > 0 && (
-          <p className="hint">
-            Not found in this document: {step.missing.map(attributeName).join(', ')}.
-          </p>
-        )}
+        {step.signed && <p className="hint">{t('import.done.signed')}</p>}
+        {missingLine(step.missing)}
         <div className="actions">
           <Link href="/dashboard" className="button">
-            Open your vault
+            {t('import.done.open')}
           </Link>
           <button type="button" className="button quiet" onClick={() => setStep({ name: 'idle' })}>
-            Import another document
+            {t('import.done.another')}
           </button>
         </div>
       </div>
     )
   }
 
-  return (
-    <form className="panel form" onSubmit={onSubmit}>
-      <DemoDocuments />
+  const busyLabel: MessageKey | null =
+    step.name === 'reading'
+      ? 'import.reading'
+      : step.name === 'encrypting'
+        ? 'import.encrypting'
+        : null
 
+  return (
+    <form className="card form" onSubmit={onSubmit}>
       <FilePicker
         name="file"
         accept=".pdf,.txt,application/pdf,text/plain"
-        label="Document"
-        hint="A PDF or a text file, up to 5 MB. Identity documents are refused here: they go through the identity check on this page."
+        label={t('import.file')}
+        hint={t('import.fileHint')}
       />
 
       <div className="field">
-        <label htmlFor="kind">Type of document</label>
-        <select id="kind" name="kind" defaultValue="synthetic">
-          {documentKinds.map((k) => (
-            <option key={k.kind} value={k.kind}>
-              {k.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="field">
-        <strong>Attributes to read</strong>
+        <strong>{t('import.attributes')}</strong>
         <span className="hint">
-          Only the ones you tick are read, and at most {MAX_ATTRIBUTES_PER_IMPORT} per document.
-          Anything else in the file is ignored.
+          {t('import.attributesHint', { max: MAX_ATTRIBUTES_PER_IMPORT })}
         </span>
         <div className="groups">
           {attributeCategories.map((group) => (
             <fieldset key={group.category} className="field group">
-              <legend>{group.name}</legend>
+              <legend>{t(`cat.${group.category}`)}</legend>
               <div className="checks-grid">
-                {attributesOf(group.category).map((a) => (
-                  <label key={a.attribute} className="check">
-                    <input
-                      type="checkbox"
-                      name="attributes"
-                      value={a.attribute}
-                      defaultChecked={
-                        group.category === 'identity' || group.category === 'education'
-                      }
-                    />
-                    {a.name}
-                  </label>
-                ))}
+                {attributesOf(group.category).map((a) =>
+                  a.attribute === NAME_ATTRIBUTE ? (
+                    <label key={a.attribute} className="check" title={t('import.nameRequired')}>
+                      <input type="checkbox" checked disabled readOnly />
+                      <span>
+                        {attr(a.attribute)}
+                        <span className="check-note">{t('import.nameRequired')}</span>
+                      </span>
+                    </label>
+                  ) : (
+                    <label key={a.attribute} className="check">
+                      <input
+                        type="checkbox"
+                        name="attributes"
+                        value={a.attribute}
+                        defaultChecked={group.category === 'identity'}
+                      />
+                      {attr(a.attribute)}
+                    </label>
+                  ),
+                )}
               </div>
             </fieldset>
           ))}
@@ -312,23 +321,22 @@ export function ImportPanel() {
       </div>
 
       <label className="check consent">
-        <input type="checkbox" name="consent" required />
-        <span>
-          Glimpse may read this document on its server to extract the attributes above. The text is
-          not stored, and each value is encrypted in this browser before it is saved.
-        </span>
+        <input type="checkbox" name="consent" />
+        <span>{t('import.consent')}</span>
       </label>
 
-      <button type="submit" className="button" disabled={busy}>
-        {step.name === 'reading'
-          ? 'Reading the document…'
-          : step.name === 'encrypting'
-            ? 'Encrypting in your browser…'
-            : 'Extract'}
-      </button>
+      <div className="actions">
+        <button type="submit" className="button" disabled={busy}>
+          {busyLabel && <span className="spinner" aria-hidden="true" />}
+          {busyLabel ? t(busyLabel) : t('import.submit')}
+        </button>
+      </div>
       {step.name === 'error' && (
         <p role="alert" className="error">
-          {step.message} {step.signedOut && <Link href="/login?next=/import">Sign in</Link>}
+          {te(step.message)}{' '}
+          {step.code === 'SIGNED_OUT' && (
+            <Link href="/login?next=/import">{t('import.signInAgain')}</Link>
+          )}
         </p>
       )}
     </form>

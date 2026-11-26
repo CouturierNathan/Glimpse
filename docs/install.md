@@ -29,7 +29,8 @@ To host it instead of running it locally, see [deploy.md](deploy.md).
 | Variable                             | Default                                      | What                                                                                             |
 | ------------------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `SESSION_SECRET`                     | none, required                               | HMAC key of the session cookies                                                                  |
-| `PADES_TRUST_ANCHORS`                | unset: no PDF signature is trusted           | PEM bundle of accepted CAs. Demo only: `fixtures/identity/FAKE-test-ca.pem`                      |
+| `PADES_TRUST_ANCHORS`                | unset: no PDF signature is trusted           | PEM bundle of accepted CAs. Demo only: `../../tests/fixtures/documents/FAKE-test-ca.pem`         |
+| `GLIMPSE_ALLOW_TEST_AUTHORITIES`     | unset: test CA ignored in production builds  | `1` lets a production build trust the FAKE test CA, for a public demo only                       |
 | `OLLAMA_MODEL`                       | unset: offline synthetic extractor           | Local Ollama model for extraction. The synthetic extractor only accepts synthetic demo documents |
 | `VAULT_DATA_DIR`                     | `apps/web/.vault-data`                       | Where the encrypted items are written, when the file store runs                                  |
 | `VAULT_STORAGE`                      | unset: file where it runs, else memory       | `file` or `memory`. The file store needs POSIX and refuses to start elsewhere                    |
@@ -38,29 +39,20 @@ To host it instead of running it locally, see [deploy.md](deploy.md).
 | `NEXT_PUBLIC_REGISTRIES_DEPLOYED_AT` | `55053387`                                   | Block the issuer portal's indexer starts from                                                    |
 | `NEXT_PUBLIC_INDEX_RPC`              | `https://base-sepolia-rpc.publicnode.com`    | RPC for event indexing (`https://sepolia.base.org` caps `eth_getLogs` at 200 blocks)             |
 
-## Demo documents
+## Test documents
 
-The app offers them: the import screen and the identity check each link the files they take, and
-the app serves them from `apps/web/public/demo/`. Nothing else is needed to run a demo.
+The FAKE test documents (identity proofs, certificates, test CA) live in
+[`tests/fixtures/documents/`](../tests/fixtures/documents/README.md), with a README listing what
+each one shows and a demo journey. The app no longer offers them for download: pick them from the
+repository. They describe invented people; none is a real France Identité document or a real trust
+anchor, and a production build ignores the FAKE test CA unless `GLIMPSE_ALLOW_TEST_AUTHORITIES=1`.
 
-| File                                     | What it shows                                          |
-| ---------------------------------------- | ------------------------------------------------------ |
-| `FAKE-identity-proof.pdf`                | A proof that passes against `FAKE-test-ca.pem`         |
-| `FAKE-identity-proof-wrong-signer.pdf`   | The same proof from a signer no trusted CA certifies   |
-| `demo-complete-record.txt`               | All 19 attributes: identity, address, education, work  |
-| `demo-student-certificate.txt`           | Identity, address and education                        |
-| `demo-employment-certificate.txt`        | Identity, job, contract and salary                     |
-| `FAKE-signed-synthetic-certificate.pdf`  | The student certificate, signed: imports as class B    |
-| `FAKE-signed-employment-certificate.pdf` | The employment certificate, signed: imports as class B |
+Importing a document or adding an attestation requires a verified identity (France Identité proof
+checked and bound to the wallet), and the document's full name must match that identity.
 
-They describe an invented person; none is a real France Identité document or a real trust anchor.
-Rebuild them all with `npm run fixtures:identity -w apps/web`, which writes both `public/demo/`
-and the `fixtures/identity/` copies the tests and `PADES_TRUST_ANCHORS` read.
-
-The text documents import anywhere. The signed PDFs are the ones that come back as class B, and
-reading a PDF's text needs poppler on the server, so they work where `pdftotext` is installed and
-not on a host without it. `npm run check:demo -w apps/web` runs the real extractor over the text
-documents and fails if a label stops matching.
+`npm run check:demo -w apps/web` runs the real extractor over the text documents. With the dev
+server running, `npm run e2e -w apps/web` replays the holder journey through the API: identity
+gate, valid / forged / tampered proofs, matching and mismatching documents, both languages.
 
 ## Checks
 

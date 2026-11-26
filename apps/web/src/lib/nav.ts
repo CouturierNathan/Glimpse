@@ -1,16 +1,18 @@
 import type { Route } from 'next'
 
+import type { MessageKey } from './i18n/messages.ts'
+
 export interface NavItem {
   href: '/import' | '/dashboard' | '/consent' | '/verify' | '/issuer'
-  label: string
+  label: MessageKey
 }
 
 export const navItems: readonly NavItem[] = [
-  { href: '/dashboard', label: 'Vault' },
-  { href: '/import', label: 'Import' },
-  { href: '/consent', label: 'Requests' },
-  { href: '/verify', label: 'Verify' },
-  { href: '/issuer', label: 'Issue' },
+  { href: '/dashboard', label: 'nav.vault' },
+  { href: '/import', label: 'nav.import' },
+  { href: '/consent', label: 'nav.requests' },
+  { href: '/verify', label: 'nav.verify' },
+  { href: '/issuer', label: 'nav.issue' },
 ]
 
 /** A nav item stays active on its own sub-pages, e.g. `/import/review`. */

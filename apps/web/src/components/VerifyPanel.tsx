@@ -9,12 +9,14 @@ import { signTypedData, switchChain } from 'wagmi/actions'
 
 import { appChain } from '@/lib/chains.ts'
 import { formatClaimValue } from '@/lib/format.ts'
-import { statusCopy } from '@/lib/status.ts'
-import { attributeName, importAttributes } from '@/lib/vault/attributes.ts'
+import type { MessageKey } from '@/lib/i18n/messages.ts'
+import { statusKeys } from '@/lib/status.ts'
+import { importAttributes } from '@/lib/vault/attributes.ts'
 import { checkNames, outcomeNames, verifyShared } from '@/lib/verify-client.ts'
 import { wagmiConfig } from '@/lib/wagmi.ts'
 import { MAX_PURPOSE_LENGTH } from '@/lib/request-limits.ts'
 
+import { useI18n } from './I18nProvider.tsx'
 import { connectedAddress, describeWalletError, useSession } from './SessionProvider.tsx'
 import { StatusBadge } from './StatusBadge.tsx'
 import { useVault } from './VaultProvider.tsx'
@@ -28,18 +30,24 @@ type Step =
   | { name: 'signing' }
   | { name: 'waiting'; requestId: string; attribute: string }
   | { name: 'closed'; requestId: string; state: string }
-  | { name: 'result'; result: VerificationResult; attribute: string; value: string }
+  | {
+      name: 'result'
+      result: VerificationResult
+      attribute: string
+      value: Parameters<typeof formatClaimValue>[0]
+    }
   | { name: 'failed'; message: string }
 
-const closedCopy: Record<string, string> = {
-  refused: 'The holder refused to share.',
-  expired: 'Nobody answered in time. The request has expired.',
-  withdrawn: 'The holder withdrew the consent before you received the item.',
+const closedCopy: Record<string, MessageKey> = {
+  refused: 'verify.closed.refused',
+  expired: 'verify.closed.expired',
+  withdrawn: 'verify.closed.withdrawn',
 }
 
 export function VerifyPanel() {
   const { address } = useSession()
   const { identity, request, receive } = useVault()
+  const { t, attr, error: te, date, locale } = useI18n()
   const [step, setStep] = useState<Step>({ name: 'form' })
   const [copied, setCopied] = useState(false)
   // Kept out of `step`: changing step would restart the polling effect mid-verification.
@@ -113,7 +121,7 @@ export function VerifyPanel() {
         const result = await verifyShared(signed, claim, signed.requester as `0x${string}`)
         setChecking(false)
         if (!cancelled) {
-          setStep({ name: 'result', result, attribute, value: formatClaimValue(claim.value) })
+          setStep({ name: 'result', result, attribute, value: claim.value })
         }
       } catch (error) {
         clearInterval(timer)
@@ -121,7 +129,7 @@ export function VerifyPanel() {
         if (!cancelled) {
           setStep({
             name: 'failed',
-            message: error instanceof Error ? error.message : 'Verification failed.',
+            message: error instanceof Error ? error.message : 'verify.failed',
           })
         }
       }
@@ -134,23 +142,23 @@ export function VerifyPanel() {
 
   const restart = (
     <button type="button" className="button quiet" onClick={() => setStep({ name: 'form' })}>
-      Ask for something else
+      {t('verify.restart')}
     </button>
   )
 
   if (step.name === 'waiting') {
     const link = `${window.location.origin}/consent/${step.requestId}`
     return (
-      <div className="panel request-status" aria-live="polite">
+      <div className="card request-status" aria-live="polite">
         {!checking ? (
           <>
-            <h2>Waiting for the holder</h2>
-            <p className="hint">
-              Send this link to the person whose {attributeName(step.attribute).toLowerCase()} you
-              need to check. This page updates when they answer.
-            </p>
+            <h2 className="loading-line">
+              <span className="pulse" aria-hidden="true" />
+              {t('verify.waiting')}
+            </h2>
+            <p className="hint">{t('verify.waitingHint', { name: attr(step.attribute) })}</p>
             <div className="link-row">
-              <input className="link" readOnly value={link} aria-label="Request link" />
+              <input className="link" readOnly value={link} aria-label={t('verify.link')} />
               <button
                 type="button"
                 className="button quiet"
@@ -159,12 +167,15 @@ export function VerifyPanel() {
                   setCopied(true)
                 }}
               >
-                {copied ? 'Copied' : 'Copy link'}
+                {copied ? t('verify.copied') : t('verify.copy')}
               </button>
             </div>
           </>
         ) : (
-          <h2>Checking what the holder shared…</h2>
+          <h2 className="loading-line">
+            <span className="spinner" aria-hidden="true" />
+            {t('verify.checking')}
+          </h2>
         )}
       </div>
     )
@@ -172,8 +183,8 @@ export function VerifyPanel() {
 
   if (step.name === 'closed') {
     return (
-      <div className="panel request-status">
-        <h2>{closedCopy[step.state] ?? 'This request is closed.'}</h2>
+      <div className="card request-status">
+        <h2>{t(closedCopy[step.state] ?? 'verify.closed.other')}</h2>
         <div className="actions">{restart}</div>
       </div>
     )
@@ -181,9 +192,9 @@ export function VerifyPanel() {
 
   if (step.name === 'failed') {
     return (
-      <div className="panel request-status">
+      <div className="card request-status">
         <p role="alert" className="error">
-          {step.message}
+          {step.message === 'verify.failed' ? t('verify.failed') : te(step.message)}
         </p>
         <div className="actions">{restart}</div>
       </div>
@@ -193,23 +204,24 @@ export function VerifyPanel() {
   if (step.name === 'result') {
     const { result } = step
     return (
-      <div className="panel request-status verdict">
+      <div className="card request-status verdict" data-verdict={result.verdict}>
         <StatusBadge status={result.verdict} />
         <h2>
-          {attributeName(step.attribute)}: {step.value}
+          {attr(step.attribute)}
+          {locale === 'fr' ? ' : ' : ': '}
+          {formatClaimValue(step.value, locale)}
         </h2>
-        <p className="hint">{statusCopy[result.verdict].meaning}</p>
+        <p className="hint">{t(statusKeys[result.verdict].meaning)}</p>
         <dl className="checks">
           {(Object.keys(checkNames) as (keyof typeof checkNames)[]).map((check) => (
             <div key={check} data-outcome={result.checks[check]}>
-              <dt>{checkNames[check]}</dt>
-              <dd>{outcomeNames[result.checks[check]]}</dd>
+              <dt>{t(checkNames[check])}</dt>
+              <dd>{t(outcomeNames[result.checks[check]])}</dd>
             </div>
           ))}
         </dl>
         <p className="hint">
-          Checked in this browser against the chain, at{' '}
-          {new Date(result.checkedAt).toLocaleTimeString()}.
+          {t('verify.checkedAt', { time: date(result.checkedAt, { timeStyle: 'medium' }) })}
         </p>
         <div className="actions">{restart}</div>
       </div>
@@ -217,35 +229,38 @@ export function VerifyPanel() {
   }
 
   return (
-    <form className="panel form" onSubmit={onSubmit}>
+    <form className="card form" onSubmit={onSubmit}>
       <div className="field">
-        <label htmlFor="attribute">What to check</label>
+        <label htmlFor="attribute">{t('verify.what')}</label>
         <select id="attribute" name="attribute" defaultValue={importAttributes[0]?.attribute}>
           {importAttributes.map((a) => (
             <option key={a.attribute} value={a.attribute}>
-              {a.name}
+              {attr(a.attribute)}
             </option>
           ))}
         </select>
       </div>
       <div className="field">
-        <label htmlFor="purpose">Why you need it</label>
+        <label htmlFor="purpose">{t('verify.why')}</label>
         <textarea
           id="purpose"
           name="purpose"
           required
           maxLength={MAX_PURPOSE_LENGTH}
           rows={3}
-          placeholder="Check the exam score for the master's admission"
+          placeholder={t('verify.whyPlaceholder')}
         />
-        <span className="hint">The holder reads this before deciding.</span>
+        <span className="hint">{t('verify.whyHint')}</span>
       </div>
-      <button type="submit" className="button" disabled={step.name === 'signing'}>
-        {step.name === 'signing' ? 'Sign in your wallet…' : 'Sign and create the request'}
-      </button>
+      <div className="actions">
+        <button type="submit" className="button" disabled={step.name === 'signing'}>
+          {step.name === 'signing' && <span className="spinner" aria-hidden="true" />}
+          {step.name === 'signing' ? t('verify.signing') : t('verify.submit')}
+        </button>
+      </div>
       {step.name === 'form' && step.error && (
         <p role="alert" className="error">
-          {step.error}
+          {te(step.error)}
         </p>
       )}
     </form>

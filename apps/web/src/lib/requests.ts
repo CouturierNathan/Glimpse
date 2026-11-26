@@ -58,10 +58,13 @@ export function requestView(stored: StoredRequest, session: Session, holderId: s
 
 export class RequestError extends Error {
   readonly status: number
-  constructor(status: number, message: string) {
+  /** A stable code the browser acts on, e.g. sending the holder to the identity check. */
+  readonly code: string | undefined
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.name = 'RequestError'
     this.status = status
+    this.code = code
   }
 }
 

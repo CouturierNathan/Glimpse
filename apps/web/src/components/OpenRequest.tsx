@@ -3,9 +3,12 @@
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useState } from 'react'
 
+import { useI18n } from './I18nProvider.tsx'
+
 /** Takes a request link, or just its id, and opens it. */
 export function OpenRequest() {
   const router = useRouter()
+  const { t } = useI18n()
   const [error, setError] = useState(false)
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -20,8 +23,10 @@ export function OpenRequest() {
   }
 
   return (
-    <form className="open-request" onSubmit={onSubmit}>
-      <label htmlFor="link">Request link</label>
+    <form className="open-request" onSubmit={onSubmit} noValidate>
+      <label htmlFor="link" className="sr-only">
+        {t('requests.open.label')}
+      </label>
       <div className="link-row">
         <input
           id="link"
@@ -30,15 +35,14 @@ export function OpenRequest() {
           placeholder="https://…/consent/…"
           aria-invalid={error}
           onChange={() => setError(false)}
-          required
         />
         <button type="submit" className="button">
-          Open
+          {t('requests.open.button')}
         </button>
       </div>
       {error && (
         <p role="alert" className="error">
-          This is not a Glimpse request link. Ask the requester to send it again.
+          {t('requests.open.invalid')}
         </p>
       )}
     </form>

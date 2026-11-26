@@ -4,10 +4,12 @@ import type { Route } from 'next'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
+import { useI18n } from './I18nProvider.tsx'
 import { useSession } from './SessionProvider.tsx'
 
 export function SignInPanel({ next }: { next: Route }) {
   const { status, error, signIn } = useSession()
+  const { t, error: te } = useI18n()
   const router = useRouter()
 
   useEffect(() => {
@@ -18,26 +20,27 @@ export function SignInPanel({ next }: { next: Route }) {
 
   return (
     <div className="panel">
-      <ol>
+      <ol className="numbered">
         <li>
           <div>
-            <strong>Connect your wallet</strong>
-            <span>MetaMask or any browser wallet.</span>
+            <strong>{t('signIn.step1.title')}</strong>
+            <span>{t('signIn.step1.text')}</span>
           </div>
         </li>
         <li>
           <div>
-            <strong>Sign the message</strong>
-            <span>It proves you own the address. No transaction, no gas.</span>
+            <strong>{t('signIn.step2.title')}</strong>
+            <span>{t('signIn.step2.text')}</span>
           </div>
         </li>
       </ol>
-      <button type="button" className="button" onClick={signIn} disabled={busy}>
-        {status === 'signing-in' ? 'Check your wallet…' : 'Connect wallet and sign in'}
+      <button type="button" className="button wide" onClick={signIn} disabled={busy}>
+        {status === 'signing-in' && <span className="spinner" aria-hidden="true" />}
+        {status === 'signing-in' ? t('signIn.busy') : t('signIn.button')}
       </button>
       {error && (
         <p role="alert" className="error">
-          {error}
+          {te(error)}
         </p>
       )}
     </div>

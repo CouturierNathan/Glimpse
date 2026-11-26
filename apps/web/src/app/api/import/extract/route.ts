@@ -1,8 +1,9 @@
 import type { DocumentReference, ExtractedClaim, IdentityValidationReport } from '@glimpse/shared'
 import { NextResponse } from 'next/server'
 
-import { identityReports, validateSignedPdf } from '@/lib/identity/server.ts'
-import { readUploadRequest } from '@/lib/vault/attributes.ts'
+import { identityReports, namesVerifiedHolder, validateSignedPdf } from '@/lib/identity/server.ts'
+import { RequestError } from '@/lib/requests.ts'
+import { NAME_ATTRIBUTE, readUploadRequest } from '@/lib/vault/attributes.ts'
 import { errorResponse, noStore, readLimitedBody, vaultErrorResponse } from '@/lib/vault/http.ts'
 import { consents, extractionService, requireHolder } from '@/lib/vault/server.ts'
 
@@ -27,7 +28,8 @@ function textPages(bytes: Uint8Array) {
 /**
  * Reads the consented attributes from a document, described by the shared DocumentUploadRequest
  * in the `request` part. The text is processed in memory and never stored; only the extracted
- * claims go back to the browser, which encrypts them itself.
+ * claims go back to the browser, which encrypts them itself. Only a holder whose identity is
+ * verified imports, and only a document whose name is theirs.
  */
 export async function POST(request: Request) {
   const { holder, failure } = await requireHolder()
@@ -35,6 +37,7 @@ export async function POST(request: Request) {
 
   let documentId: string | undefined
   try {
+    const identity = identityReports.requireVerified(holder.holderId)
     const raw = await readLimitedBody(request, MAX_BODY_BYTES)
     const form = await new Response(Uint8Array.from(raw), {
       headers: { 'Content-Type': request.headers.get('content-type') ?? '' },
@@ -45,9 +48,12 @@ export async function POST(request: Request) {
     const file = form?.get('file')
     const upload = typeof part === 'string' ? readUploadRequest(parseJson(part)) : null
     if (!upload || !(file instanceof File)) {
-      return errorResponse(400, 'Choose a document, its type and the attributes to extract.')
+      return errorResponse(400, 'Choose a document and the attributes to extract.')
     }
     documentId = upload.documentId
+    if (!upload.attributes.includes(NAME_ATTRIBUTE)) {
+      throw new RequestError(400, 'The full name is always read, to match it with your identity.')
+    }
     const names = upload.attributes
     const metadata = { documentId, documentVersion: upload.documentVersion, kind: upload.kind }
     const bytes = new Uint8Array(await file.arrayBuffer())
@@ -67,6 +73,21 @@ export async function POST(request: Request) {
       }
       if (pages.length > MAX_PAGES) return errorResponse(413, 'The document has too many pages.')
       claims = await service.extract({ ...metadata, pages }, names)
+    }
+    const name = claims.find((claim) => claim.attribute === NAME_ATTRIBUTE)?.value
+    if (name?.type !== 'string') {
+      throw new RequestError(
+        422,
+        'No full name could be read from this document, so it cannot be matched with your identity.',
+        'NAME_MISMATCH',
+      )
+    }
+    if (!namesVerifiedHolder(identity.name, name.value)) {
+      throw new RequestError(
+        403,
+        'The name on this document does not match your verified identity.',
+        'NAME_MISMATCH',
+      )
     }
     // The extractor always says class A. Only a signature this server verified makes the claims
     // class B, with the report as evidence; nothing here can make them class C.

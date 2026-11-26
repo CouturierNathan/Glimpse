@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { bindingMessage } from '@/lib/identity/binding.ts'
-import { identityReports, validateSignedPdf } from '@/lib/identity/server.ts'
+import { identityReports, proofHolderName, validateSignedPdf } from '@/lib/identity/server.ts'
 import { errorResponse, noStore, readLimitedBody, vaultErrorResponse } from '@/lib/vault/http.ts'
 import { requireHolder } from '@/lib/vault/server.ts'
 
@@ -9,9 +9,10 @@ import { requireHolder } from '@/lib/vault/server.ts'
 const MAX_BODY_BYTES = 5 * 1024 * 1024 + 64 * 1024
 
 /**
- * Checks the PAdES signature of a France Identité PDF and keeps the report for the holder. The PDF
- * is read in memory, never stored, and never reaches the extractor. A passed report comes back
- * with the binding message the holder's wallet signs next.
+ * Checks the PAdES signature of a France Identité PDF and keeps the report for the holder, with
+ * fingerprints of the name it states. The PDF is read in memory, never stored, and never reaches
+ * the extractor. A passed report whose name could be read comes back with the binding message the
+ * holder's wallet signs next.
  */
 export async function POST(request: Request) {
   const { holder, session, failure } = await requireHolder()
@@ -26,10 +27,13 @@ export async function POST(request: Request) {
     const file = form?.get('file')
     if (!(file instanceof File)) return errorResponse(400, 'Choose the PDF to check.')
 
-    const report = await validateSignedPdf(new Uint8Array(await file.arrayBuffer()))
-    identityReports.add(holder.holderId, report)
-    const binding = report.indication === 'TOTAL_PASSED' ? bindingMessage(report, session) : null
-    return NextResponse.json({ report, binding }, { headers: noStore })
+    const pdf = new Uint8Array(await file.arrayBuffer())
+    const report = await validateSignedPdf(pdf)
+    // The name only counts when the signature covering it passed.
+    const name = report.indication === 'TOTAL_PASSED' ? proofHolderName(pdf) : undefined
+    identityReports.add(holder.holderId, report, name)
+    const binding = name ? bindingMessage(report, session) : null
+    return NextResponse.json({ report, binding, nameFound: Boolean(name) }, { headers: noStore })
   } catch (error) {
     return vaultErrorResponse(error)
   }
