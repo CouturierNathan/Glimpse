@@ -15,7 +15,6 @@ import type {
   AttributeSpec,
   ExtractionModel,
 } from '@glimpse/vault/server'
-import { pdfToolsSkip } from '@glimpse/vault/server/testing'
 const document: ExtractionDocument = {
   documentId: 'a'.repeat(32),
   documentVersion: 1,
@@ -150,34 +149,30 @@ test('model outputs purged after invalid output and consent withdrawal during in
     assert.deepEqual(raw, [])
   }
 })
-test(
-  'privacy PDF jobs purge files on success and provider failure',
-  { skip: pdfToolsSkip() },
-  async (t) => {
-    const root = await mkdtemp(join(tmpdir(), 'glimpse-private-job-'))
-    t.after(() => rm(root, { recursive: true, force: true }))
-    const pdf = await readFile(new URL('../fixtures/education-synthetic.pdf', import.meta.url))
-    const { pages: _pages, ...metadata } = document
-    for (const failure of [false, true]) {
-      const service = createPrivateExtractionService({
-        authenticate: auth,
-        readConsent: () => Promise.resolve(consent()),
-        attributes: specs,
-        temporaryRoot: root,
-        model: failure
-          ? {
-              name: 'ollama-local:test',
-              complete: () => Promise.reject(new Error('private provider content')),
-            }
-          : syntheticDemoModel(),
-      })
-      if (failure) {
-        await assert.rejects(
-          service.extractPdf(pdf, metadata, ['student_status']),
-          (error) => error instanceof Error && !error.message.includes('private provider content'),
-        )
-      } else assert.equal((await service.extractPdf(pdf, metadata, ['student_status'])).length, 1)
-      assert.deepEqual(await readdir(root), [])
-    }
-  },
-)
+test('privacy PDF jobs purge files on success and provider failure', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'glimpse-private-job-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const pdf = await readFile(new URL('../fixtures/education-synthetic.pdf', import.meta.url))
+  const { pages: _pages, ...metadata } = document
+  for (const failure of [false, true]) {
+    const service = createPrivateExtractionService({
+      authenticate: auth,
+      readConsent: () => Promise.resolve(consent()),
+      attributes: specs,
+      temporaryRoot: root,
+      model: failure
+        ? {
+            name: 'ollama-local:test',
+            complete: () => Promise.reject(new Error('private provider content')),
+          }
+        : syntheticDemoModel(),
+    })
+    if (failure) {
+      await assert.rejects(
+        service.extractPdf(pdf, metadata, ['student_status']),
+        (error) => error instanceof Error && !error.message.includes('private provider content'),
+      )
+    } else assert.equal((await service.extractPdf(pdf, metadata, ['student_status'])).length, 1)
+    assert.deepEqual(await readdir(root), [])
+  }
+})

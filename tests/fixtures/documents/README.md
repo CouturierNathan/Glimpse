@@ -10,19 +10,19 @@ files never count as a real identity there. A public demo deployment opts in exp
 
 ## Files
 
-| File                                     | Signature        | Person              | What it shows                                                      |
-| ---------------------------------------- | ---------------- | ------------------- | ------------------------------------------------------------------ |
-| `FAKE-test-ca.pem`                       | —                | —                   | The FAKE test CA. Point `PADES_TRUST_ANCHORS` at it for a demo     |
-| `FAKE-identity-proof.pdf`                | valid            | Camille SYNTHETIQUE | France Identité proof that passes and binds                        |
-| `FAKE-identity-proof-other-person.pdf`   | valid            | Jordan EXEMPLE      | Passes, but matches none of the documents below: imports refused   |
-| `FAKE-identity-proof-wrong-signer.pdf`   | untrusted signer | Camille SYNTHETIQUE | Look-alike signer no trusted CA certifies: fails the chain check   |
-| `FAKE-identity-proof-tampered.pdf`       | broken           | Camille → CAMILLA   | One letter changed after signing: fails the integrity check        |
-| `FAKE-signed-synthetic-certificate.pdf`  | valid            | Camille SYNTHETIQUE | Student certificate, signed: imports as class B (needs poppler)    |
-| `FAKE-signed-employment-certificate.pdf` | valid            | Camille SYNTHETIQUE | Employment certificate, signed: imports as class B (needs poppler) |
-| `demo-complete-record.txt`               | none             | Camille SYNTHETIQUE | All 19 attributes; imports as class A on any machine               |
-| `demo-student-certificate.txt`           | none             | Camille SYNTHETIQUE | Identity, address and education                                    |
-| `demo-employment-certificate.txt`        | none             | Camille SYNTHETIQUE | Identity, job, contract and salary                                 |
-| `demo-other-person-certificate.txt`      | none             | Jordan EXEMPLE      | Another person's document: refused for Camille's identity          |
+| File                                     | Signature        | Person              | What it shows                                                    |
+| ---------------------------------------- | ---------------- | ------------------- | ---------------------------------------------------------------- |
+| `FAKE-test-ca.pem`                       | —                | —                   | The FAKE test CA. Point `PADES_TRUST_ANCHORS` at it for a demo   |
+| `FAKE-identity-proof.pdf`                | valid            | Camille SYNTHETIQUE | France Identité proof that passes and binds                      |
+| `FAKE-identity-proof-other-person.pdf`   | valid            | Jordan EXEMPLE      | Passes, but matches none of the documents below: imports refused |
+| `FAKE-identity-proof-wrong-signer.pdf`   | untrusted signer | Camille SYNTHETIQUE | Look-alike signer no trusted CA certifies: fails the chain check |
+| `FAKE-identity-proof-tampered.pdf`       | broken           | Camille → CAMILLA   | One letter changed after signing: fails the integrity check      |
+| `FAKE-signed-synthetic-certificate.pdf`  | valid            | Camille SYNTHETIQUE | Student certificate, signed: imports as class B                  |
+| `FAKE-signed-employment-certificate.pdf` | valid            | Camille SYNTHETIQUE | Employment certificate, signed: imports as class B               |
+| `demo-complete-record.txt`               | none             | Camille SYNTHETIQUE | All 19 attributes; imports as class A on any machine             |
+| `demo-student-certificate.txt`           | none             | Camille SYNTHETIQUE | Identity, address and education                                  |
+| `demo-employment-certificate.txt`        | none             | Camille SYNTHETIQUE | Identity, job, contract and salary                               |
+| `demo-other-person-certificate.txt`      | none             | Jordan EXEMPLE      | Another person's document: refused for Camille's identity        |
 
 ## A demo journey
 
