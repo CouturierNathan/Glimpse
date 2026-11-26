@@ -11,7 +11,7 @@
     "contracts"
   ],
   "scripts": {
-    "lint": "eslint . && (test ! -d contracts || solhint --noPrompt \"contracts/**/*.sol\")",
+    "lint": "eslint . && solhint --noPrompt \"contracts/**/*.sol\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "npm test --workspaces --if-present"

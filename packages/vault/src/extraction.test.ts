@@ -12,6 +12,7 @@ import {
   withPdfPages,
 } from '@glimpse/vault/server'
 import type { AttributeSpec, ExtractionDocument, ExtractionModel } from '@glimpse/vault/server'
+import { pdfToolsSkip } from '@glimpse/vault/server/testing'
 const text = await readFile(new URL('../fixtures/education-synthetic.txt', import.meta.url), 'utf8')
 const doc: ExtractionDocument = {
   documentId: 'a'.repeat(32),
@@ -96,7 +97,8 @@ test('document prompt injection rejected before any model call; uncertain/ambigu
   await assert.rejects(extractClaims({ ...doc, kind: 'identity' }, specs, model))
   await assert.rejects(extractClaims(doc, specs, model))
 })
-test('real PDF text parser and real OCR produce the requested claims', async () => {
+const pdfTools = { skip: pdfToolsSkip() }
+test('real PDF text parser and real OCR produce the requested claims', pdfTools, async () => {
   for (const name of ['education-synthetic.pdf', 'education-scanned-synthetic.pdf']) {
     const pdf = await readFile(new URL(`../fixtures/${name}`, import.meta.url))
     const claims = await withPdfPages(pdf, (pages) =>
@@ -106,23 +108,27 @@ test('real PDF text parser and real OCR produce the requested claims', async () 
     assert.equal(claims[1]?.value.value, 42)
   }
 })
-test('PDF temporary source/OCR files purged after success and callback failure', async (t) => {
-  const root = await mkdtemp(join(tmpdir(), 'glimpse-pdf-test-'))
-  t.after(() => rm(root, { recursive: true, force: true }))
-  const pdf = await readFile(new URL('../fixtures/education-synthetic.pdf', import.meta.url))
-  await withPdfPages(pdf, () => Promise.resolve(1), { temporaryRoot: root })
-  assert.deepEqual(await readdir(root), [])
-  await assert.rejects(
-    withPdfPages(pdf, () => Promise.reject(new Error('sensitive callback content')), {
-      temporaryRoot: root,
-    }),
-    (error) => error instanceof Error && !error.message.includes('sensitive'),
-  )
-  assert.deepEqual(await readdir(root), [])
-  await assert.rejects(
-    withPdfPages(new Uint8Array([1, 2]), () => Promise.resolve(1), { temporaryRoot: root }),
-  )
-})
+test(
+  'PDF temporary source/OCR files purged after success and callback failure',
+  pdfTools,
+  async (t) => {
+    const root = await mkdtemp(join(tmpdir(), 'glimpse-pdf-test-'))
+    t.after(() => rm(root, { recursive: true, force: true }))
+    const pdf = await readFile(new URL('../fixtures/education-synthetic.pdf', import.meta.url))
+    await withPdfPages(pdf, () => Promise.resolve(1), { temporaryRoot: root })
+    assert.deepEqual(await readdir(root), [])
+    await assert.rejects(
+      withPdfPages(pdf, () => Promise.reject(new Error('sensitive callback content')), {
+        temporaryRoot: root,
+      }),
+      (error) => error instanceof Error && !error.message.includes('sensitive'),
+    )
+    assert.deepEqual(await readdir(root), [])
+    await assert.rejects(
+      withPdfPages(new Uint8Array([1, 2]), () => Promise.resolve(1), { temporaryRoot: root }),
+    )
+  },
+)
 test('Ollama adapter speaks the real HTTP protocol with bounded JSON and no redirects', async (t) => {
   let mode = 'ok'
   let body = ''

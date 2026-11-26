@@ -14,7 +14,7 @@ import {
   fingerprintBytes,
 } from '@glimpse/vault'
 import { createVaultStorage, createFileStorageBackend, StorageError } from '@glimpse/vault/server'
-import { createMemoryStorageBackendForTests } from '@glimpse/vault/server/testing'
+import { createMemoryStorageBackendForTests, posixStorageSkip } from '@glimpse/vault/server/testing'
 const encode = (bytes: ArrayBuffer) => Buffer.from(bytes).toString('base64url')
 test('well-formed public-key forgery is rejected even when all public identifiers match', async () => {
   const holder = await generateEncryptionKeys(generateOpaqueId())
@@ -91,44 +91,48 @@ test('well-formed public-key forgery is rejected even when all public identifier
   })
   assert.deepEqual(await decryptItem(item.record, item.envelope, holder, expected), claim)
 })
-test('exact pinned upload bytes survive file persistence; server substitution fails before parsing', async (t) => {
-  const root = await mkdtemp(join(tmpdir(), 'glimpse-pinned-'))
-  t.after(() => rm(root, { recursive: true, force: true }))
-  const holder = await generateEncryptionKeys(generateOpaqueId())
-  const claim = parseContract('ExtractedClaim', fixtures.valid.ExtractedClaim)
-  const item = await encryptItem(claim, claim.document, holder, {
-    itemId: generateOpaqueId(),
-    itemVersion: 1,
-    grantId: generateOpaqueId(),
-  })
-  const api = createVaultStorage({
-    backend: await createFileStorageBackend({ directory: root }),
-    authenticate: () =>
-      Promise.resolve({
-        holderId: holder.recipientId,
-        encryptionKeyIds: [holder.recipientKeyId],
-        expiresAt: Date.now() + 60_000,
-      }),
-  })
-  const packed = await packEncryptedItem({ record: item.record, envelopes: [item.envelope] })
-  // The exact-byte endpoint must not normalize whitespace/key order provided by a trusted client.
-  const pretty = new TextEncoder().encode(
-    JSON.stringify(JSON.parse(new TextDecoder().decode(packed.bytes)), null, 2) + '\n',
-  )
-  const pin = await fingerprintBytes(pretty)
-  const ref = await api.putBytes(pretty)
-  const bytes = await api.getBytes(ref)
-  assert.ok(bytes)
-  assert.deepEqual(bytes, pretty)
-  assert.deepEqual(await verifyEncryptedItem(bytes, pin), {
-    record: item.record,
-    envelopes: [item.envelope],
-  })
-  await writeFile(join(root, holder.recipientId, `${ref}.json`), packed.bytes)
-  const altered = await api.getBytes(ref)
-  assert.ok(altered)
-  await assert.rejects(verifyEncryptedItem(altered, pin), { name: 'IntegrityError' })
-})
+test(
+  'exact pinned upload bytes survive file persistence; server substitution fails before parsing',
+  { skip: posixStorageSkip() },
+  async (t) => {
+    const root = await mkdtemp(join(tmpdir(), 'glimpse-pinned-'))
+    t.after(() => rm(root, { recursive: true, force: true }))
+    const holder = await generateEncryptionKeys(generateOpaqueId())
+    const claim = parseContract('ExtractedClaim', fixtures.valid.ExtractedClaim)
+    const item = await encryptItem(claim, claim.document, holder, {
+      itemId: generateOpaqueId(),
+      itemVersion: 1,
+      grantId: generateOpaqueId(),
+    })
+    const api = createVaultStorage({
+      backend: await createFileStorageBackend({ directory: root }),
+      authenticate: () =>
+        Promise.resolve({
+          holderId: holder.recipientId,
+          encryptionKeyIds: [holder.recipientKeyId],
+          expiresAt: Date.now() + 60_000,
+        }),
+    })
+    const packed = await packEncryptedItem({ record: item.record, envelopes: [item.envelope] })
+    // The exact-byte endpoint must not normalize whitespace/key order provided by a trusted client.
+    const pretty = new TextEncoder().encode(
+      JSON.stringify(JSON.parse(new TextDecoder().decode(packed.bytes)), null, 2) + '\n',
+    )
+    const pin = await fingerprintBytes(pretty)
+    const ref = await api.putBytes(pretty)
+    const bytes = await api.getBytes(ref)
+    assert.ok(bytes)
+    assert.deepEqual(bytes, pretty)
+    assert.deepEqual(await verifyEncryptedItem(bytes, pin), {
+      record: item.record,
+      envelopes: [item.envelope],
+    })
+    await writeFile(join(root, holder.recipientId, `${ref}.json`), packed.bytes)
+    const altered = await api.getBytes(ref)
+    assert.ok(altered)
+    await assert.rejects(verifyEncryptedItem(altered, pin), { name: 'IntegrityError' })
+  },
+)
 test('key removal produces FORBIDDEN rather than a false corruption diagnosis', async () => {
   const holder = await generateEncryptionKeys(generateOpaqueId())
   const claim = parseContract('ExtractedClaim', fixtures.valid.ExtractedClaim)

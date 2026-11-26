@@ -1,4 +1,5 @@
 package-lock.json
+.vscode/
 contracts/artifacts/
 contracts/cache/
 contracts/types/
