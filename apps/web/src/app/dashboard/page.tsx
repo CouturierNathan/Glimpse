@@ -8,8 +8,8 @@ import { storageDurable } from '@/lib/vault/server.ts'
 export const generateMetadata = titled('title.vault')
 
 const sources = [
-  { mark: 'mark', title: 'source.A', text: 'source.A.text' },
-  { mark: 'mark signed', title: 'source.B', text: 'source.B.text' },
+  { mark: 'mark', title: 'source.A.title', text: 'source.A.text' },
+  { mark: 'mark signed', title: 'source.B.title', text: 'source.B.text' },
   { mark: 'mark attested', title: 'source.C.title', text: 'source.C.text' },
 ] as const
 

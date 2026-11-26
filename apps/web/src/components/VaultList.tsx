@@ -37,7 +37,9 @@ function Row({ item }: { item: VaultItem }) {
         <strong>{attr(item.attribute)}</strong>
         <span className="item-meta">
           <StatusBadge status={holderStatus(item.sourceClass)} />
-          {t(sourceKey[item.sourceClass])}
+          <span className="source-badge" data-source={item.sourceClass}>
+            {t(sourceKey[item.sourceClass])}
+          </span>
         </span>
       </div>
       <div className="item-value" aria-live="polite">
