@@ -1071,6 +1071,15 @@ a {
   line-height: 1.65;
 }
 
+/*
+ * It is a label by markup — it labels the checkbox — but a sentence to read, not a field title,
+ * so it does not take `.field > label`'s bold. The selector carries one more class than that rule
+ * on purpose: without it the two tie and the bold wins by source order.
+ */
+.field > label.consent {
+  font-weight: 400;
+}
+
 .consent input {
   margin-top: 0.2rem;
 }
