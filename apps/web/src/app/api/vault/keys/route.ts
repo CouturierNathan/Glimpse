@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     ) {
       return errorResponse(400, 'The public key is not a valid encryption key.')
     }
-    holders.registerKey(session.address, session.chainId, recipientKeyId, publicKey)
+    await holders.registerKey(session.address, session.chainId, recipientKeyId, publicKey)
     return new Response(null, { status: 204, headers: noStore })
   } catch (error) {
     if (error instanceof SyntaxError) return errorResponse(400, 'The request was malformed.')

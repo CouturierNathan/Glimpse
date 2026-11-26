@@ -2,6 +2,7 @@ import { type IdentityValidationReport, parseContract } from '@glimpse/shared'
 import { type Hex, sha256, stringToBytes } from 'viem'
 
 import { RequestError } from '../requests.ts'
+import { getJson, type Kv, setJson } from '../state/kv.ts'
 
 import type { HolderName } from './holder-name.ts'
 
@@ -51,50 +52,62 @@ export const IDENTITY_REQUIRED = 'Verify your identity with France Identité fir
 export const NAME_UNREADABLE =
   'The name on this proof could not be read. Use the PDF from the France Identité app.'
 
-/** Validation reports and their wallet bindings, in memory: a server restart forgets them. */
-export class IdentityReportStore {
-  readonly #entries = new Map<string, Entry>()
+/** A checked report stays bindable this long; the binding that verifies an identity, this long. */
+export const REPORT_TTL_MS = 60 * 60 * 1000
+export const IDENTITY_TTL_MS = 90 * 24 * 60 * 60 * 1000
 
-  add(holderId: string, report: IdentityValidationReport, name?: HolderName): void {
-    this.#entries.set(report.reportId, name ? { holderId, report, name } : { holderId, report })
+type Verified = Entry & { name: HolderName; binding: NonNullable<Entry['binding']> }
+
+/**
+ * Validation reports and the identity they verify, in the state store: a report checked on one
+ * instance can be bound on another, and a verified identity outlives a restart. It keeps the
+ * report and keyed fingerprints of the name, never the PDF and never the name itself.
+ */
+export class IdentityReportStore {
+  readonly #kv: Kv
+
+  constructor(kv: Kv) {
+    this.#kv = kv
+  }
+
+  async add(holderId: string, report: IdentityValidationReport, name?: HolderName): Promise<void> {
+    const entry: Entry = name ? { holderId, report, name } : { holderId, report }
+    await setJson(this.#kv, `report:${report.reportId}`, entry, { ttlMs: REPORT_TTL_MS })
   }
 
   /**
    * The holder's verified identity: the last proof that passed, states a name and is bound to
    * their wallet. Without it, nothing can be imported or added to the vault.
    */
-  verified(holderId: string): (Entry & { name: HolderName }) | null {
-    let found: (Entry & { name: HolderName }) | null = null
-    for (const entry of this.#entries.values()) {
-      if (entry.holderId === holderId && entry.binding && entry.name) {
-        found = entry as Entry & { name: HolderName }
-      }
-    }
-    return found
+  verified(holderId: string): Promise<Verified | null> {
+    return getJson<Verified>(this.#kv, `identity:${holderId}`)
   }
 
   /** Like `verified`, but throws the answer the routes send when there is none. */
-  requireVerified(holderId: string): Entry & { name: HolderName } {
-    const entry = this.verified(holderId)
+  async requireVerified(holderId: string): Promise<Verified> {
+    const entry = await this.verified(holderId)
     if (!entry) throw new RequestError(403, IDENTITY_REQUIRED, 'IDENTITY_REQUIRED')
     return entry
   }
 
   /** The holder's own report; another holder's reads as missing. */
-  get(holderId: string, reportId: string): Entry | null {
-    const entry = this.#entries.get(reportId)
+  async get(holderId: string, reportId: string): Promise<Entry | null> {
+    if (!/^[0-9a-f]{32}$/.test(reportId)) return null
+    const entry = await getJson<Entry>(this.#kv, `report:${reportId}`)
     return entry?.holderId === holderId ? entry : null
   }
 
   /** Records a binding whose signature the caller has checked. A report is bound once. */
-  bind(holderId: string, reportId: string, address: string, signature: Hex): void {
-    const entry = this.get(holderId, reportId)
+  async bind(holderId: string, reportId: string, address: string, signature: Hex): Promise<void> {
+    const entry = await this.get(holderId, reportId)
     if (!entry) throw new RequestError(404, 'This report does not exist.')
     if (entry.report.indication !== 'TOTAL_PASSED') {
       throw new RequestError(409, 'Only a document whose signature passed can be bound.')
     }
     if (!entry.name) throw new RequestError(422, NAME_UNREADABLE)
     if (entry.binding) throw new RequestError(409, 'This report is already bound to a wallet.')
-    entry.binding = { address, signature }
+    const bound = { ...entry, binding: { address, signature } }
+    await setJson(this.#kv, `report:${reportId}`, bound, { ttlMs: REPORT_TTL_MS })
+    await setJson(this.#kv, `identity:${holderId}`, bound, { ttlMs: IDENTITY_TTL_MS })
   }
 }

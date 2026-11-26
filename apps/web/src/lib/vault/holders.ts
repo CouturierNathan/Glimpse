@@ -1,18 +1,14 @@
-import { randomBytes } from 'node:crypto'
+import { createHmac } from 'node:crypto'
+
+import { getJson, type Kv, setJson } from '../state/kv.ts'
 
 const OPAQUE_ID = /^[0-9a-f]{32}$/
-/** Each page load registers a fresh encryption key; older ones stay to open older items. */
+/** Each browser registers one key and keeps it; a few more cover other browsers and resets. */
 export const MAX_KEYS_PER_HOLDER = 64
 
 export interface HolderIdentity {
   holderId: string
   encryptionKeyIds: string[]
-}
-
-interface Holder {
-  holderId: string
-  /** recipientKeyId -> SPKI public key, base64url. */
-  keys: Map<string, string>
 }
 
 export class HolderKeyError extends Error {
@@ -23,54 +19,55 @@ export class HolderKeyError extends Error {
 }
 
 /**
- * Maps a signed-in wallet to an opaque vault holder and its encryption keys. The holder id is
- * random: it is neither the address nor a hash of it, so stored objects never point to a wallet.
- * In memory for now, so a server restart forgets every holder.
+ * Maps a signed-in wallet to an opaque vault holder and its encryption keys. The holder id is a
+ * keyed hash of the wallet with a server secret: the same on every instance and after a restart,
+ * so the vault reopens, yet without the secret it does not point back to a wallet. The public keys
+ * live in the state store, never a private key.
  */
 export class HolderRegistry {
-  readonly #holders = new Map<string, Holder>()
+  readonly #kv: Kv
+  readonly #secret: () => Buffer
 
-  #walletKey(address: string, chainId: number): string {
-    return `${chainId}:${address.toLowerCase()}`
+  constructor(kv: Kv, secret: () => Buffer) {
+    this.#kv = kv
+    this.#secret = secret
   }
 
-  /** The wallet's holder id, created on first use. */
+  /** The wallet's holder id. */
   ensure(address: string, chainId: number): string {
-    const key = this.#walletKey(address, chainId)
-    let holder = this.#holders.get(key)
-    if (!holder) {
-      holder = { holderId: randomBytes(16).toString('hex'), keys: new Map() }
-      this.#holders.set(key, holder)
-    }
-    return holder.holderId
+    return createHmac('sha256', this.#secret())
+      .update(`holder:${chainId}:${address.toLowerCase()}`)
+      .digest('hex')
+      .slice(0, 32)
+  }
+
+  async #keys(holderId: string): Promise<Record<string, string>> {
+    return (await getJson<Record<string, string>>(this.#kv, `holder-keys:${holderId}`)) ?? {}
   }
 
   /** The wallet's holder, or null until it has registered at least one key. */
-  find(address: string, chainId: number): HolderIdentity | null {
-    const holder = this.#holders.get(this.#walletKey(address, chainId))
-    if (!holder || holder.keys.size === 0) return null
-    return { holderId: holder.holderId, encryptionKeyIds: [...holder.keys.keys()] }
+  async find(address: string, chainId: number): Promise<HolderIdentity | null> {
+    const holderId = this.ensure(address, chainId)
+    const keys = Object.keys(await this.#keys(holderId))
+    return keys.length === 0 ? null : { holderId, encryptionKeyIds: keys }
   }
 
   /** A registered public key, so a holder can wrap an item key for this recipient. */
-  publicKey(holderId: string, keyId: string): string | null {
-    for (const holder of this.#holders.values()) {
-      if (holder.holderId === holderId) return holder.keys.get(keyId) ?? null
-    }
-    return null
+  async publicKey(holderId: string, keyId: string): Promise<string | null> {
+    return (await this.#keys(holderId))[keyId] ?? null
   }
 
-  registerKey(address: string, chainId: number, keyId: string, publicKey: string): void {
+  async registerKey(address: string, chainId: number, keyId: string, publicKey: string) {
     if (!OPAQUE_ID.test(keyId)) throw new HolderKeyError('Invalid key id')
-    const holder = this.#holders.get(this.#walletKey(address, chainId))
-    if (!holder) throw new HolderKeyError('Unknown holder')
-    const known = holder.keys.get(keyId)
+    const holderId = this.ensure(address, chainId)
+    const keys = await this.#keys(holderId)
+    const known = keys[keyId]
     if (known !== undefined) {
       // Re-sending the same key is harmless; rebinding an id to another key is not.
       if (known !== publicKey) throw new HolderKeyError('Key id already bound to another key')
       return
     }
-    if (holder.keys.size >= MAX_KEYS_PER_HOLDER) throw new HolderKeyError('Too many keys')
-    holder.keys.set(keyId, publicKey)
+    if (Object.keys(keys).length >= MAX_KEYS_PER_HOLDER) throw new HolderKeyError('Too many keys')
+    await setJson(this.#kv, `holder-keys:${holderId}`, { ...keys, [keyId]: publicKey })
   }
 }

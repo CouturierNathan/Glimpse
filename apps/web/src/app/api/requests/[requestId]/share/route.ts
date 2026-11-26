@@ -1,7 +1,7 @@
 import { findRequest, isRequesterCall, requesterCaller } from '@/lib/requests-http.ts'
 import { RequestError } from '@/lib/requests.ts'
 import { noStore, vaultErrorResponse } from '@/lib/vault/http.ts'
-import { requests, requireHolder, shareService } from '@/lib/vault/server.ts'
+import { requireHolder, shareService } from '@/lib/vault/server.ts'
 
 type Context = RouteContext<'/api/requests/[requestId]/share'>
 
@@ -12,7 +12,7 @@ type Context = RouteContext<'/api/requests/[requestId]/share'>
  */
 export async function GET(request: Request, { params }: Context) {
   try {
-    const { stored, bundle } = findRequest((await params).requestId)
+    const { stored, bundle } = await findRequest((await params).requestId)
     if (!(await isRequesterCall(request, bundle))) {
       throw new RequestError(403, 'This is not your request.')
     }
@@ -37,12 +37,13 @@ export async function DELETE(_request: Request, { params }: Context) {
   if (failure) return failure
   const { requestId } = await params
   try {
-    const { stored } = findRequest(requestId)
+    const { stored, store, save } = await findRequest(requestId)
     if (stored.decision?.holderId !== holder.holderId) {
       throw new RequestError(403, 'Only the holder who answered can withdraw.')
     }
     if (stored.shareReference) await (await shareService()).revoke(stored.shareReference)
-    requests.withdraw(requestId)
+    store.withdraw(requestId)
+    await save()
     return new Response(null, { status: 204, headers: noStore })
   } catch (error) {
     return vaultErrorResponse(error)

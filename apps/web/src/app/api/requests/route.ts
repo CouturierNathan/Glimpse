@@ -4,7 +4,7 @@ import { validateBundle } from '@/lib/requests.ts'
 import { importAttributes } from '@/lib/vault/attributes.ts'
 import { noStore, vaultErrorResponse } from '@/lib/vault/http.ts'
 import { isEncryptionKey } from '@/lib/vault/keys.ts'
-import { bundles, requests } from '@/lib/vault/server.ts'
+import { requests } from '@/lib/vault/server.ts'
 
 const attributes = new Set(importAttributes.map((a) => a.attribute))
 
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       attributes,
       isEncryptionKey,
     })
-    bundles.add(bundle, requests, list)
+    await requests.create(bundle, list)
     return Response.json({ requestId: bundle.bundleId }, { status: 201, headers: noStore })
   } catch (error) {
     return vaultErrorResponse(error)

@@ -13,13 +13,13 @@ export async function POST(request: Request) {
   if (failure) return failure
 
   try {
-    identityReports.requireVerified(holder.holderId)
+    await identityReports.requireVerified(holder.holderId)
     const upload = readUploadRequest(
       JSON.parse(new TextDecoder().decode(await readLimitedBody(request, 4096))),
     )
     if (!upload) return errorResponse(400, 'Choose at least one attribute to extract.')
     const { documentId, documentVersion, attributes } = upload
-    consents.grant({ holderId: holder.holderId, documentId, documentVersion, attributes })
+    await consents.grant({ holderId: holder.holderId, documentId, documentVersion, attributes })
     return new Response(null, { status: 204, headers: noStore })
   } catch (error) {
     if (error instanceof SyntaxError) return errorResponse(400, 'The request was malformed.')

@@ -944,6 +944,8 @@ export const errorTranslations: Record<string, string> = {
   'Key id already bound to another key': 'Cet identifiant de clé est déjà lié à une autre clé.',
   'Too many keys': 'Trop de clés enregistrées. Reconnectez-vous.',
   'Invalid key id': 'Identifiant de clé invalide.',
+  'The registries could not be read from the chain.':
+    'Les registres n’ont pas pu être lus sur la blockchain.',
   'Unknown holder': 'Titulaire inconnu. Reconnectez-vous.',
   'The request was malformed.': 'La requête est mal formée.',
   'The request is malformed.': 'La requête est mal formée.',

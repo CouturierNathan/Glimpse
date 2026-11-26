@@ -1,10 +1,11 @@
-import { randomBytes } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { basename, resolve } from 'node:path'
 
 import { type Address, createPublicClient, type Hex, http, verifyMessage } from 'viem'
 
 import { appChain } from '@/lib/chains.ts'
+import { derivedKey } from '@/lib/state/server.ts'
+import { stateStore } from '@/lib/vault/server.ts'
 
 import { IdentityReportStore } from './binding.ts'
 import {
@@ -18,13 +19,14 @@ import { pemCertificates, validatePades } from './pades.ts'
 
 // Kept on globalThis so every route handler, and dev hot reloads, share the same state.
 const shared = globalThis as {
-  glimpseIdentityReports?: IdentityReportStore
   glimpseTrustAnchors?: Promise<Uint8Array[]>
-  glimpseNameKey?: Uint8Array
 }
-export const identityReports = (shared.glimpseIdentityReports ??= new IdentityReportStore())
-/** Keys the name fingerprints. Random per process: they mean nothing outside this server. */
-const nameKey = (shared.glimpseNameKey ??= new Uint8Array(randomBytes(32)))
+export const identityReports = new IdentityReportStore(stateStore)
+/**
+ * Keys the name fingerprints. Derived from the server secret: the same on every instance and
+ * after a restart, so a verified identity still matches, and meaningless without the secret.
+ */
+const nameKey = () => new Uint8Array(derivedKey('name-fingerprint'))
 
 /** Where the FAKE test documents live; see tests/fixtures/documents/README.md. */
 const TEST_DOCUMENTS = 'tests/fixtures/documents'
@@ -91,12 +93,12 @@ function trustAnchors(): Promise<Uint8Array[]> {
 /** The fingerprinted name a proof states, or `undefined` when it cannot be read. */
 export function proofHolderName(pdf: Uint8Array): HolderName | undefined {
   const name = readHolderName(pdfTextLines(pdf))
-  return name ? fingerprintName(name, nameKey) : undefined
+  return name ? fingerprintName(name, nameKey()) : undefined
 }
 
 /** Whether a document's full name names the holder whose identity was verified. */
 export function namesVerifiedHolder(verified: HolderName, documentName: string): boolean {
-  return namesMatch(verified, documentName, nameKey)
+  return namesMatch(verified, documentName, nameKey())
 }
 
 export async function validateSignedPdf(pdf: Uint8Array) {

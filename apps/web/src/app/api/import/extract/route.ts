@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
   let documentId: string | undefined
   try {
-    const identity = identityReports.requireVerified(holder.holderId)
+    const identity = await identityReports.requireVerified(holder.holderId)
     const raw = await readLimitedBody(request, MAX_BODY_BYTES)
     const form = await new Response(Uint8Array.from(raw), {
       headers: { 'Content-Type': request.headers.get('content-type') ?? '' },
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
       provenance: { class: 'A' },
     }
     if (report?.indication === 'TOTAL_PASSED') {
-      identityReports.add(holder.holderId, report)
+      await identityReports.add(holder.holderId, report)
       source = {
         ...source,
         provenance: { class: 'B', signatureVerificationId: report.reportId },
@@ -109,6 +109,6 @@ export async function POST(request: Request) {
     return vaultErrorResponse(error)
   } finally {
     // One consent covers one extraction run.
-    if (documentId) consents.withdraw(holder.holderId, documentId)
+    if (documentId) await consents.withdraw(holder.holderId, documentId)
   }
 }

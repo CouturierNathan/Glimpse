@@ -22,17 +22,18 @@ talks to the chain itself.
 
 Set these on the project, for Production and Preview. Only the first is required.
 
-| Variable                             | Value                                                       |
-| ------------------------------------ | ----------------------------------------------------------- |
-| `SESSION_SECRET`                     | `openssl rand -base64 32`, kept out of the repository       |
-| `PADES_TRUST_ANCHORS`                | `../../tests/fixtures/documents/FAKE-test-ca.pem` (demo)    |
-| `GLIMPSE_ALLOW_TEST_AUTHORITIES`     | `1`, already set by `vercel.json`, for the public demo only |
-| `VAULT_DATA_DIR`                     | `/tmp/glimpse-vault`, already set by `vercel.json`          |
-| `VAULT_STORAGE`                      | `memory` to skip `/tmp` entirely; unset uses the file store |
-| `NEXT_PUBLIC_ATTESTATION_REGISTRY`   | only to point at another deployment of the contracts        |
-| `NEXT_PUBLIC_ISSUER_REGISTRY`        | idem                                                        |
-| `NEXT_PUBLIC_REGISTRIES_DEPLOYED_AT` | idem                                                        |
-| `NEXT_PUBLIC_INDEX_RPC`              | idem                                                        |
+| Variable                               | Value                                                       |
+| -------------------------------------- | ----------------------------------------------------------- |
+| `SESSION_SECRET`                       | `openssl rand -base64 32`, kept out of the repository       |
+| `PADES_TRUST_ANCHORS`                  | `../../tests/fixtures/documents/FAKE-test-ca.pem` (demo)    |
+| `GLIMPSE_ALLOW_TEST_AUTHORITIES`       | `1`, already set by `vercel.json`, for the public demo only |
+| `VAULT_DATA_DIR`                       | `/tmp/glimpse-vault`, already set by `vercel.json`          |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | set by the Upstash for Redis integration: shared state      |
+| `VAULT_STORAGE`                        | `memory` to skip `/tmp` entirely; unset uses the file store |
+| `NEXT_PUBLIC_ATTESTATION_REGISTRY`     | only to point at another deployment of the contracts        |
+| `NEXT_PUBLIC_ISSUER_REGISTRY`          | idem                                                        |
+| `NEXT_PUBLIC_REGISTRIES_DEPLOYED_AT`   | idem                                                        |
+| `NEXT_PUBLIC_INDEX_RPC`                | idem                                                        |
 
 `OLLAMA_MODEL` stays unset: a hosted function reaches no local model, so extraction uses the
 offline synthetic extractor, which only accepts the synthetic demo documents.
@@ -49,28 +50,23 @@ poppler installed.
 
 Pick one region (Settings → Functions), ideally Paris (`cdg1`). The reason is below.
 
-### What a hosted deployment does not keep
+### Shared state: link a Redis store (required for a lasting deployment)
 
-The server holds the holders' registered public keys, the verification requests, the decisions, the
-extraction consents and the identity reports **in the process**, and writes the encrypted items and
-the share grants to `VAULT_DATA_DIR`. On Vercel each request is served by a function instance, every
-instance has its own memory and its own `/tmp`, and both are dropped when the instance goes away.
+Every function instance has its own memory and its own `/tmp`. For the vault, the identities and
+the requests to be the same on every instance and to survive redeploys, link a Redis store:
+Vercel → Storage → **Upstash for Redis** (Marketplace), connected to this project for Production
+and Preview. It sets `KV_REST_API_URL` and `KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_URL` /
+`UPSTASH_REDIS_REST_TOKEN`), which the app picks up on the next deployment: the encrypted items,
+the share grants and envelopes, the registered public keys, the identity checks, the consents, the
+requests and the registry index then all live there. Nothing in it opens a vault: the private keys
+stay in the browsers, and the store holds ciphertext, public keys, keyed fingerprints and requests.
 
-So, on a Vercel deployment:
+Without it, a deployment still runs, one instance at a time: a recycled instance forgets what it
+held, and the vault screen shows the temporary-storage notice. Nothing on chain is affected either
+way.
 
-- Run one journey end to end in one sitting. A pause long enough for the instance to be recycled
-  loses the requests and the items created before it.
-- The holder's and requester's keys never leave the browser (IndexedDB): that part behaves the
-  same hosted or local, but they open nothing once the server has forgotten the holder.
-- Nothing on chain is affected. Issuing, revoking and verifying read and write Base Sepolia
-  directly, so an anchored attestation and its verdict survive everything above.
-
-A single region makes an instance more likely to be reused between two requests of the same demo.
-
-To keep server state across instances and restarts, the stores behind `HolderRegistry`,
-`RequestStore`, `ExtractionConsentStore` and the identity reports have to move to a shared
-database, and `VAULT_DATA_DIR` to object storage or a volume. That is the one thing between this
-deployment and a durable one; it is listed in [limits.md](limits.md).
+Holder ids are derived from `SESSION_SECRET`: keep it the same across deployments, or every vault
+gets a new holder id and the stored items can no longer be opened.
 
 ### Verify the deployment
 

@@ -7,6 +7,8 @@ import { privateKeyToAccount } from 'viem/accounts'
 
 import { RequestError } from '../requests.ts'
 
+import { memoryKv } from '../state/kv.ts'
+
 import { bindingMessage, IdentityReportStore, reportDigest } from './binding.ts'
 import { BINDING_WARNING } from './warning.ts'
 
@@ -54,37 +56,40 @@ test('only the bound wallet signature verifies against the rebuilt message', asy
 
 const name = { surname: ['s'], givenNames: ['g'] }
 
-test('a report is bound once, by its holder, only if it passed', () => {
-  const store = new IdentityReportStore()
+test('a report is bound once, by its holder, only if it passed', async () => {
+  const store = new IdentityReportStore(memoryKv())
   const signature = `0x${'1'.repeat(130)}` as const
-  store.add('e'.repeat(32), passed, name)
-  store.add('e'.repeat(32), failed, name)
-  assert.equal(store.get('f'.repeat(32), passed.reportId), null)
-  assert.throws(() => store.bind('f'.repeat(32), passed.reportId, holder.address, signature))
-  assert.throws(() => store.bind('e'.repeat(32), failed.reportId, holder.address, signature))
-  store.bind('e'.repeat(32), passed.reportId, holder.address, signature)
-  assert.deepEqual(store.get('e'.repeat(32), passed.reportId)?.binding, {
+  await store.add('e'.repeat(32), passed, name)
+  await store.add('e'.repeat(32), failed, name)
+  assert.equal(await store.get('f'.repeat(32), passed.reportId), null)
+  await assert.rejects(store.bind('f'.repeat(32), passed.reportId, holder.address, signature))
+  await assert.rejects(store.bind('e'.repeat(32), failed.reportId, holder.address, signature))
+  await store.bind('e'.repeat(32), passed.reportId, holder.address, signature)
+  assert.deepEqual((await store.get('e'.repeat(32), passed.reportId))?.binding, {
     address: holder.address,
     signature,
   })
-  assert.throws(() => store.bind('e'.repeat(32), passed.reportId, holder.address, signature))
+  await assert.rejects(store.bind('e'.repeat(32), passed.reportId, holder.address, signature))
 })
 
-test('the identity is verified only once a passed proof with a readable name is bound', () => {
-  const store = new IdentityReportStore()
+test('the identity is verified only once a passed proof with a readable name is bound', async () => {
+  const kv = memoryKv()
+  const store = new IdentityReportStore(kv)
   const holderId = 'e'.repeat(32)
   const signature = `0x${'1'.repeat(130)}` as const
-  assert.equal(store.verified(holderId), null)
-  assert.throws(() => store.requireVerified(holderId), { code: 'IDENTITY_REQUIRED', status: 403 })
+  assert.equal(await store.verified(holderId), null)
+  await assert.rejects(store.requireVerified(holderId), { code: 'IDENTITY_REQUIRED', status: 403 })
 
   const unnamed = { ...passed, reportId: 'c'.repeat(32) }
-  store.add(holderId, unnamed)
-  assert.throws(() => store.bind(holderId, unnamed.reportId, holder.address, signature), {
+  await store.add(holderId, unnamed)
+  await assert.rejects(store.bind(holderId, unnamed.reportId, holder.address, signature), {
     status: 422,
   })
-  store.add(holderId, passed, name)
-  assert.equal(store.verified(holderId), null, 'checked but not bound yet')
-  store.bind(holderId, passed.reportId, holder.address, signature)
-  assert.deepEqual(store.requireVerified(holderId).name, name)
-  assert.equal(store.verified('f'.repeat(32)), null, "another holder's proof does not count")
+  await store.add(holderId, passed, name)
+  assert.equal(await store.verified(holderId), null, 'checked but not bound yet')
+  await store.bind(holderId, passed.reportId, holder.address, signature)
+  assert.deepEqual((await store.requireVerified(holderId)).name, name)
+  assert.equal(await store.verified('f'.repeat(32)), null, "another holder's proof does not count")
+  // Another instance, or the same server after a restart, reading the same store agrees.
+  assert.deepEqual((await new IdentityReportStore(kv).requireVerified(holderId)).name, name)
 })

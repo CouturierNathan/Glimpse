@@ -1,7 +1,7 @@
 import { findRequest, readJson } from '@/lib/requests-http.ts'
-import { RequestError } from '@/lib/requests.ts'
+import { claimBundle, RequestError } from '@/lib/requests.ts'
 import { noStore, vaultErrorResponse } from '@/lib/vault/http.ts'
-import { bundles, requests, requireHolder, shareService, vaultStorage } from '@/lib/vault/server.ts'
+import { requireHolder, shareService, vaultStorage } from '@/lib/vault/server.ts'
 
 type Context = RouteContext<'/api/requests/[requestId]/decision'>
 
@@ -16,12 +16,13 @@ export async function POST(request: Request, { params }: Context) {
   if (failure) return failure
   const { requestId } = await params
   try {
-    const { bundle } = findRequest(requestId)
-    bundles.claim(bundle, holder.holderId)
+    const { bundle, store, save } = await findRequest(requestId)
+    claimBundle(bundle, holder.holderId)
     const body = (await readJson(request)) as { outcome?: unknown; reference?: unknown }
 
     if (body.outcome === 'deny') {
-      requests.decide(requestId, holder.holderId, { outcome: 'deny' })
+      store.decide(requestId, holder.holderId, { outcome: 'deny' })
+      await save()
       return new Response(null, { status: 204, headers: noStore })
     }
     if (body.outcome !== 'allow' || typeof body.reference !== 'string') {
@@ -33,19 +34,23 @@ export async function POST(request: Request, { params }: Context) {
     const item = await (await vaultStorage()).get(body.reference)
     if (!item) throw new RequestError(404, 'This item is not in your vault.')
 
-    requests.decide(requestId, holder.holderId, {
+    store.decide(requestId, holder.holderId, {
       outcome: 'allow',
       itemId: item.record.itemId,
       itemVersion: item.record.itemVersion,
     })
+    // Saved first: the share service reads the live consent back from the store.
+    await save()
     let ticket
     try {
       ticket = await (await shareService()).authorize(body.reference, requestId)
     } catch (error) {
-      requests.reopen(requestId) // no grant was created: the holder may answer again
+      store.reopen(requestId) // no grant was created: the holder may answer again
+      await save()
       throw error
     }
-    requests.authorized(requestId, ticket.shareReference)
+    store.authorized(requestId, ticket.shareReference)
+    await save()
 
     return Response.json(
       {

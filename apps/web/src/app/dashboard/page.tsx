@@ -3,7 +3,7 @@ import { PageHead } from '@/components/PageHead.tsx'
 import { StatusLegend } from '@/components/StatusBadge.tsx'
 import { VaultList } from '@/components/VaultList.tsx'
 import { titled } from '@/lib/i18n/server.ts'
-import { storageMode } from '@/lib/vault/server.ts'
+import { storageDurable } from '@/lib/vault/server.ts'
 
 export const generateMetadata = titled('title.vault')
 
@@ -14,13 +14,13 @@ const sources = [
 ] as const
 
 export default async function DashboardPage() {
-  const mode = await storageMode()
+  const durable = await storageDurable()
 
   return (
     <section>
       <PageHead title="title.vault" who="who.holder" lede="vault.lede" />
 
-      {mode === 'memory' && (
+      {!durable && (
         <aside className="notice" role="note">
           <svg viewBox="0 0 20 20" aria-hidden="true" className="notice-icon">
             <circle cx="10" cy="10" r="8" />

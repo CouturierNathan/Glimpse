@@ -9,9 +9,9 @@ import type { ConsentDecision } from '@glimpse/vault/server'
 import { requestDomain, requestMessage, requestTypes } from '@glimpse/verifier'
 import { type Address, type Hex, isAddressEqual, verifyTypedData } from 'viem'
 
+import { getJson, type Kv, setJson } from './state/kv.ts'
 import {
   MAX_ATTRIBUTES_PER_REQUEST,
-  MAX_OPEN_REQUESTS,
   MAX_PURPOSE_LENGTH,
   MAX_REQUEST_LIFETIME_MS,
   MAX_REQUESTER_NAME_LENGTH,
@@ -160,6 +160,17 @@ export function toConsentDecision(decision: AccessDecision): ConsentDecision | n
 export class RequestStore {
   readonly #requests = new Map<string, StoredRequest>()
 
+  /** A store holding these requests, as read back from the state store. */
+  static from(entries: readonly StoredRequest[]): RequestStore {
+    const store = new RequestStore()
+    for (const entry of entries) store.#requests.set(entry.request.requestId, entry)
+    return store
+  }
+
+  entries(): StoredRequest[] {
+    return [...this.#requests.values()]
+  }
+
   add(request: VerificationRequest): void {
     if (this.#requests.has(request.requestId)) {
       throw new RequestError(409, 'This request already exists.')
@@ -217,10 +228,6 @@ export class RequestStore {
     }
     stored.state = 'shared'
     stored.expected = expected
-  }
-
-  remove(requestId: string): void {
-    this.#requests.delete(requestId)
   }
 
   /** The holder takes the consent back: the requester can no longer download the item. */
@@ -344,61 +351,90 @@ export async function validateBundle(
 
 export type Role = 'requester' | 'holder' | 'visitor'
 
-/** Bundles and the requests they hold, in memory: a server restart forgets them. */
-export class BundleStore {
-  readonly #bundles = new Map<string, RequestBundle>()
-  readonly #byRequest = new Map<string, string>()
+/** One holder answers a bundle; a second holder with the same link is turned away. */
+export function claimBundle(bundle: RequestBundle, holderId: string): void {
+  if (bundle.holderId && bundle.holderId !== holderId) {
+    throw new RequestError(409, 'This request was already answered.')
+  }
+  bundle.holderId = holderId
+}
 
-  add(
-    bundle: RequestBundle,
-    store: RequestStore,
-    requests: VerificationRequest[],
-    now = Date.now(),
-  ) {
-    this.#purge(store, now)
-    if (this.#bundles.size >= MAX_OPEN_REQUESTS) {
-      throw new RequestError(503, 'Too many open requests right now. Try again later.')
-    }
-    if (
-      this.#bundles.has(bundle.bundleId) ||
-      requests.some((r) => this.#byRequest.has(r.requestId) || store.get(r.requestId, now))
-    ) {
-      throw new RequestError(409, 'This request already exists.')
-    }
+const KEPT_AFTER_EXPIRY_MS = 24 * 3600 * 1000
+
+/** A bundle read from the state store, changed in place, then written back with `save()`. */
+export interface OpenBundle {
+  bundle: RequestBundle
+  store: RequestStore
+  save(): Promise<void>
+}
+
+/**
+ * Requests in the state store: one entry per bundle, holding the bundle and its pieces' states,
+ * and an index from each piece to its bundle. Every instance reads the same requests, and they
+ * outlive a restart. Each is dropped a day after it expires.
+ */
+export class RequestRepository {
+  readonly #kv: Kv
+
+  constructor(kv: Kv) {
+    this.#kv = kv
+  }
+
+  #ttl(bundle: RequestBundle, now: number) {
+    return Math.max(1000, Date.parse(bundle.expiresAt) + KEPT_AFTER_EXPIRY_MS - now)
+  }
+
+  async create(bundle: RequestBundle, requests: VerificationRequest[], now = Date.now()) {
+    const store = new RequestStore()
+    for (const request of requests) store.add(request)
+    const ttlMs = this.#ttl(bundle, now)
+    const created = await setJson(
+      this.#kv,
+      `bundle:${bundle.bundleId}`,
+      { bundle, requests: store.entries() },
+      { ttlMs, onlyIfAbsent: true },
+    )
+    if (!created) throw new RequestError(409, 'This request already exists.')
     for (const request of requests) {
-      store.add(request)
-      this.#byRequest.set(request.requestId, bundle.bundleId)
-    }
-    this.#bundles.set(bundle.bundleId, bundle)
-  }
-
-  get(bundleId: string): RequestBundle | null {
-    return this.#bundles.get(bundleId) ?? null
-  }
-
-  ofRequest(requestId: string): RequestBundle | null {
-    const id = this.#byRequest.get(requestId)
-    return id ? this.get(id) : null
-  }
-
-  /** One holder answers a bundle; a second holder with the same link is turned away. */
-  claim(bundle: RequestBundle, holderId: string): void {
-    if (bundle.holderId && bundle.holderId !== holderId) {
-      throw new RequestError(409, 'This request was already answered.')
-    }
-    bundle.holderId = holderId
-  }
-
-  /** Drops bundles a day past their end: nobody can answer or read them any more. */
-  #purge(store: RequestStore, now: number) {
-    for (const [id, bundle] of this.#bundles) {
-      if (Date.parse(bundle.expiresAt) + 24 * 3600 * 1000 > now) continue
-      this.#bundles.delete(id)
-      for (const requestId of bundle.requestIds) {
-        this.#byRequest.delete(requestId)
-        store.remove(requestId)
+      const indexed = await this.#kv.set(`piece:${request.requestId}`, bundle.bundleId, {
+        ttlMs,
+        onlyIfAbsent: true,
+      })
+      if (!indexed) {
+        await this.#kv.del(`bundle:${bundle.bundleId}`)
+        throw new RequestError(409, 'This request already exists.')
       }
     }
+  }
+
+  async open(bundleId: string): Promise<OpenBundle | null> {
+    if (!OPAQUE_ID.test(bundleId)) return null
+    const stored = await getJson<{ bundle: RequestBundle; requests: StoredRequest[] }>(
+      this.#kv,
+      `bundle:${bundleId}`,
+    )
+    if (!stored) return null
+    const store = RequestStore.from(stored.requests)
+    return {
+      bundle: stored.bundle,
+      store,
+      save: async () => {
+        await setJson(
+          this.#kv,
+          `bundle:${bundleId}`,
+          { bundle: stored.bundle, requests: store.entries() },
+          { ttlMs: this.#ttl(stored.bundle, Date.now()) },
+        )
+      },
+    }
+  }
+
+  /** The bundle a piece belongs to. */
+  async openPiece(requestId: string): Promise<OpenBundle | null> {
+    if (!OPAQUE_ID.test(requestId)) return null
+    const bundleId = await this.#kv.get(`piece:${requestId}`)
+    const opened = bundleId ? await this.open(bundleId) : null
+    return opened?.bundle.requestIds.includes(requestId) ? opened : null
   }
 }
 

@@ -26,18 +26,19 @@ To host it instead of running it locally, see [deploy.md](deploy.md).
 
 ## Environment (`apps/web/.env.local`)
 
-| Variable                             | Default                                      | What                                                                                             |
-| ------------------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `SESSION_SECRET`                     | none, required                               | HMAC key of the session cookies                                                                  |
-| `PADES_TRUST_ANCHORS`                | unset: no PDF signature is trusted           | PEM bundle of accepted CAs. Demo only: `../../tests/fixtures/documents/FAKE-test-ca.pem`         |
-| `GLIMPSE_ALLOW_TEST_AUTHORITIES`     | unset: test CA ignored in production builds  | `1` lets a production build trust the FAKE test CA, for a public demo only                       |
-| `OLLAMA_MODEL`                       | unset: offline synthetic extractor           | Local Ollama model for extraction. The synthetic extractor only accepts synthetic demo documents |
-| `VAULT_DATA_DIR`                     | `apps/web/.vault-data`                       | Where the encrypted items are written, when the file store runs                                  |
-| `VAULT_STORAGE`                      | unset: file where it runs, else memory       | `file` or `memory`. The file store needs POSIX and refuses to start elsewhere                    |
-| `NEXT_PUBLIC_ATTESTATION_REGISTRY`   | `0xE481E72D9aBe5B4a43405B2C58cAA972d0a6dDd6` | AttestationRegistry the issuer anchors in and the verifier reads                                 |
-| `NEXT_PUBLIC_ISSUER_REGISTRY`        | `0x07Ee362e4FFA3c6c21cBB41eb545FA45c16CF9ee` | IssuerRegistry                                                                                   |
-| `NEXT_PUBLIC_REGISTRIES_DEPLOYED_AT` | `55053387`                                   | Block the issuer portal's indexer starts from                                                    |
-| `NEXT_PUBLIC_INDEX_RPC`              | `https://base-sepolia-rpc.publicnode.com`    | RPC for event indexing (`https://sepolia.base.org` caps `eth_getLogs` at 200 blocks)             |
+| Variable                               | Default                                      | What                                                                                             |
+| -------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `SESSION_SECRET`                       | none, required                               | HMAC key of the session cookies                                                                  |
+| `PADES_TRUST_ANCHORS`                  | unset: no PDF signature is trusted           | PEM bundle of accepted CAs. Demo only: `../../tests/fixtures/documents/FAKE-test-ca.pem`         |
+| `GLIMPSE_ALLOW_TEST_AUTHORITIES`       | unset: test CA ignored in production builds  | `1` lets a production build trust the FAKE test CA, for a public demo only                       |
+| `OLLAMA_MODEL`                         | unset: offline synthetic extractor           | Local Ollama model for extraction. The synthetic extractor only accepts synthetic demo documents |
+| `VAULT_DATA_DIR`                       | `apps/web/.vault-data`                       | Where the encrypted items are written, when the file store runs                                  |
+| `VAULT_STORAGE`                        | unset: file where it runs, else memory       | `file` or `memory`. The file store needs POSIX and refuses to start elsewhere                    |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | unset: server state on disk or in memory     | Redis REST store (Upstash, Vercel KV) shared by every instance; takes precedence over the above  |
+| `NEXT_PUBLIC_ATTESTATION_REGISTRY`     | `0xE481E72D9aBe5B4a43405B2C58cAA972d0a6dDd6` | AttestationRegistry the issuer anchors in and the verifier reads                                 |
+| `NEXT_PUBLIC_ISSUER_REGISTRY`          | `0x07Ee362e4FFA3c6c21cBB41eb545FA45c16CF9ee` | IssuerRegistry                                                                                   |
+| `NEXT_PUBLIC_REGISTRIES_DEPLOYED_AT`   | `55053387`                                   | Block the issuer portal's indexer starts from                                                    |
+| `NEXT_PUBLIC_INDEX_RPC`                | `https://base-sepolia-rpc.publicnode.com`    | RPC for event indexing (`https://sepolia.base.org` caps `eth_getLogs` at 200 blocks)             |
 
 ## Test documents
 

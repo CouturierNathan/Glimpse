@@ -17,7 +17,9 @@ export async function POST(request: Request) {
   try {
     const body = (await readJson(request)) as { reportId?: unknown; signature?: unknown }
     const entry =
-      typeof body.reportId === 'string' ? identityReports.get(holder.holderId, body.reportId) : null
+      typeof body.reportId === 'string'
+        ? await identityReports.get(holder.holderId, body.reportId)
+        : null
     if (!entry) throw new RequestError(404, 'This report does not exist.')
     if (typeof body.signature !== 'string' || !isHex(body.signature)) {
       throw new RequestError(400, 'The request was malformed.')
@@ -26,7 +28,12 @@ export async function POST(request: Request) {
     if (!(await signedBy(session.address as Address, message, body.signature as Hex))) {
       throw new RequestError(401, 'The signature does not match your wallet.')
     }
-    identityReports.bind(holder.holderId, entry.report.reportId, session.address, body.signature)
+    await identityReports.bind(
+      holder.holderId,
+      entry.report.reportId,
+      session.address,
+      body.signature,
+    )
     return Response.json({ address: session.address }, { headers: noStore })
   } catch (error) {
     return vaultErrorResponse(error)

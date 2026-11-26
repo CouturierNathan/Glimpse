@@ -6,7 +6,10 @@ import type { AuthenticatedHolder, ExtractionModel, StorageBackend } from '@glim
 import { getSession } from '@/lib/auth/server.ts'
 import type { Session } from '@/lib/auth/session.ts'
 
-import { BundleStore, RequestStore } from '@/lib/requests.ts'
+import { RequestRepository } from '@/lib/requests.ts'
+import type { Kv } from '@/lib/state/kv.ts'
+import { derivedKey, redisConfig, stateKv } from '@/lib/state/server.ts'
+import { kvStorageBackend } from '@/lib/state/vault-backend.ts'
 
 import { importAttributes } from './attributes.ts'
 import { signedOut, vaultLocked } from './http.ts'
@@ -17,17 +20,28 @@ type VaultServer = typeof VaultServerModule
 
 // Kept on globalThis so every route handler, and dev hot reloads, share the same state.
 const shared = globalThis as {
-  glimpseHolders?: HolderRegistry
-  glimpseConsents?: ExtractionConsentStore
-  glimpseRequests?: RequestStore
-  glimpseBundles?: BundleStore
   glimpseVaultServer?: Promise<VaultServer>
   glimpseVaultBackend?: Promise<StorageBackend>
 }
-export const holders = (shared.glimpseHolders ??= new HolderRegistry())
-export const consents = (shared.glimpseConsents ??= new ExtractionConsentStore())
-export const requests = (shared.glimpseRequests ??= new RequestStore())
-export const bundles = (shared.glimpseBundles ??= new BundleStore())
+
+/**
+ * The server's state store (lib/state/server.ts), opened on first use: which one depends on the
+ * configuration and on whether the vault writes to disk, which is only known asynchronously.
+ */
+export function state(): Promise<Kv> {
+  return storageMode().then((mode) => stateKv(() => mode === 'file', storageDirectory))
+}
+
+/** The store, as an object the state classes can hold before it is opened. */
+export const stateStore: Kv = {
+  get: async (key) => (await state()).get(key),
+  set: async (key, value, options) => (await state()).set(key, value, options),
+  del: async (key) => (await state()).del(key),
+}
+
+export const holders = new HolderRegistry(stateStore, () => derivedKey('holder-id'))
+export const consents = new ExtractionConsentStore(stateStore)
+export const requests = new RequestRepository(stateStore)
 
 /**
  * The vault's server module, imported once per process. The import is bundled, not left to Node
@@ -43,7 +57,7 @@ function storageDirectory(): string {
   return process.env.VAULT_DATA_DIR ?? join(process.cwd(), '.vault-data')
 }
 
-export type StorageMode = 'file' | 'memory'
+export type StorageMode = 'shared' | 'file' | 'memory'
 
 /**
  * Which store the vault runs on. `VAULT_STORAGE` decides when it is set; otherwise the file one
@@ -53,18 +67,33 @@ export type StorageMode = 'file' | 'memory'
  * and the screens say so.
  */
 export async function storageMode(): Promise<StorageMode> {
+  // A Redis store shared by every instance, when the deployment has one (Vercel KV, Upstash).
+  if (redisConfig()) return 'shared'
   if (process.env.VAULT_STORAGE === 'memory') return 'memory'
   if (process.env.VAULT_STORAGE === 'file') return 'file'
   const { fileStorageSupported } = await vaultServer()
   return fileStorageSupported() ? 'file' : 'memory'
 }
 
+/**
+ * Whether the vault and the server state survive a restart and are the same on every instance:
+ * a shared store does, a private disk does on a single long-lived server, a serverless host's
+ * disk (Vercel's /tmp) and memory do not.
+ */
+export async function storageDurable(): Promise<boolean> {
+  const mode = await storageMode()
+  return mode === 'shared' || (mode === 'file' && !process.env.VERCEL)
+}
+
 async function backend(): Promise<StorageBackend> {
   const vault = await vaultServer()
+  const mode = await storageMode()
   return (shared.glimpseVaultBackend ??= (
-    (await storageMode()) === 'memory'
-      ? Promise.resolve(vault.createMemoryStorageBackend())
-      : vault.createFileStorageBackend({ directory: storageDirectory() })
+    mode === 'shared'
+      ? state().then((kv) => kvStorageBackend(kv, vault.StorageError))
+      : mode === 'memory'
+        ? Promise.resolve(vault.createMemoryStorageBackend())
+        : vault.createFileStorageBackend({ directory: storageDirectory() })
   ).catch((error: unknown) => {
     shared.glimpseVaultBackend = undefined // let the next request retry
     throw error
@@ -72,8 +101,8 @@ async function backend(): Promise<StorageBackend> {
 }
 
 /** The vault holder behind the verified session cookie; never read from the request body. */
-export function holderOf(session: Session): AuthenticatedHolder | null {
-  const identity = holders.find(session.address, session.chainId)
+export async function holderOf(session: Session): Promise<AuthenticatedHolder | null> {
+  const identity = await holders.find(session.address, session.chainId)
   if (!identity) return null
   return { ...identity, expiresAt: Date.parse(session.expiresAt) }
 }
@@ -85,7 +114,7 @@ export async function requireHolder(): Promise<
 > {
   const session = await getSession()
   if (!session) return { failure: signedOut() }
-  const holder = holderOf(session)
+  const holder = await holderOf(session)
   if (!holder) return { failure: vaultLocked() }
   return { holder, session }
 }
@@ -118,7 +147,7 @@ export async function extractionService() {
   const vault = await vaultServer()
   return vault.createPrivateExtractionService({
     authenticate,
-    readConsent: (holderId, documentId) => Promise.resolve(consents.read(holderId, documentId)),
+    readConsent: (holderId, documentId) => consents.read(holderId, documentId),
     attributes: importAttributes.map(({ attribute, label, type }) => ({ attribute, label, type })),
     model: extractionModel(vault),
   })
@@ -136,6 +165,7 @@ export async function shareService(
   return createShareService({
     backend: await backend(),
     authenticate: caller ?? authenticate,
-    readDecision: (requestId) => Promise.resolve(requests.readDecision(requestId)),
+    readDecision: async (requestId) =>
+      (await requests.openPiece(requestId))?.store.readDecision(requestId) ?? null,
   })
 }

@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const { holder, failure } = await requireHolder()
   if (failure) return failure
   try {
-    identityReports.requireVerified(holder.holderId)
+    await identityReports.requireVerified(holder.holderId)
     const { DEFAULT_MAX_OBJECT_BYTES } = await vaultServer()
     const bytes = await readLimitedBody(request, DEFAULT_MAX_OBJECT_BYTES)
     const reference = await (await vaultStorage()).putBytes(bytes)

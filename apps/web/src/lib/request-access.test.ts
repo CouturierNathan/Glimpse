@@ -8,7 +8,14 @@ import { requestDomain, requestMessage, requestTypes } from '@glimpse/verifier'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 
 import { requesterProofMessage, verifyRequesterProof } from './request-proof.ts'
-import { BundleStore, bundleView, RequestError, RequestStore, validateBundle } from './requests.ts'
+import {
+  bundleView,
+  claimBundle,
+  RequestError,
+  RequestRepository,
+  validateBundle,
+} from './requests.ts'
+import { memoryKv } from './state/kv.ts'
 
 const CHAIN = 84532
 const NOW = Date.parse('2026-11-07T12:00:00.000Z')
@@ -48,10 +55,12 @@ const context = {
 
 async function stored(attributes?: string[]) {
   const { bundle, requests } = await validateBundle(await bundleInput(attributes), context)
-  const store = new RequestStore()
-  const bundles = new BundleStore()
-  bundles.add(bundle, store, requests, NOW)
-  return { bundle, store, bundles, requests }
+  const kv = memoryKv()
+  const repo = new RequestRepository(kv)
+  await repo.create(bundle, requests, NOW)
+  const opened = await repo.open(bundle.bundleId)
+  if (!opened) throw new Error('not stored')
+  return { bundle: opened.bundle, store: opened.store, save: opened.save, repo, kv, requests }
 }
 
 test('a request for several pieces is stored as one link, each piece signed by the same key', async () => {
@@ -103,15 +112,27 @@ test('a visitor with the link sees what is asked, never how it was answered', as
 })
 
 test('only the first holder to answer can answer a request', async () => {
-  const { bundle, bundles } = await stored()
-  bundles.claim(bundle, holderId)
-  bundles.claim(bundle, holderId)
-  assert.throws(() => bundles.claim(bundle, 'f'.repeat(32)), { status: 409 })
+  const { bundle } = await stored()
+  claimBundle(bundle, holderId)
+  claimBundle(bundle, holderId)
+  assert.throws(() => claimBundle(bundle, 'f'.repeat(32)), { status: 409 })
 })
 
 test('the same request cannot be stored twice', async () => {
-  const { bundle, store, bundles, requests } = await stored()
-  assert.throws(() => bundles.add(bundle, store, requests, NOW), { status: 409 })
+  const { bundle, repo, requests } = await stored()
+  await assert.rejects(repo.create(bundle, requests, NOW), { status: 409 })
+})
+
+test('an answer saved on one instance is what another instance reads, piece by piece', async () => {
+  const { bundle, store, save, kv } = await stored()
+  const [first = ''] = bundle.requestIds
+  claimBundle(bundle, holderId)
+  store.decide(first, holderId, { outcome: 'deny' }, NOW)
+  await save()
+  const elsewhere = await new RequestRepository(kv).openPiece(first)
+  assert.equal(elsewhere?.bundle.holderId, holderId)
+  assert.equal(elsewhere?.store.get(first, NOW)?.state, 'refused')
+  assert.equal(await new RequestRepository(kv).openPiece('f'.repeat(32)), null)
 })
 
 test('only a fresh signature by the request key proves the requester', async () => {

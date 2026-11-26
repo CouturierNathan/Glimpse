@@ -9,7 +9,7 @@ import { holders } from '@/lib/vault/server.ts'
 export async function GET() {
   const session = await getSession()
   if (!session) return signedOut()
-  const holder = holders.find(session.address, session.chainId)
-  const verified = holder ? identityReports.verified(holder.holderId) !== null : false
+  const holder = await holders.find(session.address, session.chainId)
+  const verified = holder ? (await identityReports.verified(holder.holderId)) !== null : false
   return NextResponse.json({ verified }, { headers: noStore })
 }

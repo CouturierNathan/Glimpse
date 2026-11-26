@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const report = await validateSignedPdf(pdf)
     // The name only counts when the signature covering it passed.
     const name = report.indication === 'TOTAL_PASSED' ? proofHolderName(pdf) : undefined
-    identityReports.add(holder.holderId, report, name)
+    await identityReports.add(holder.holderId, report, name)
     const binding = name ? bindingMessage(report, session) : null
     return NextResponse.json({ report, binding, nameFound: Boolean(name) }, { headers: noStore })
   } catch (error) {

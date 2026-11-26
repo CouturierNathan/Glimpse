@@ -3,7 +3,7 @@ import type { ItemExpectation } from '@glimpse/vault'
 import { findRequest, readJson } from '@/lib/requests-http.ts'
 import { RequestError } from '@/lib/requests.ts'
 import { noStore, vaultErrorResponse } from '@/lib/vault/http.ts'
-import { requests, requireHolder, shareService } from '@/lib/vault/server.ts'
+import { requireHolder, shareService } from '@/lib/vault/server.ts'
 
 type Context = RouteContext<'/api/requests/[requestId]/envelope'>
 
@@ -31,7 +31,7 @@ export async function POST(request: Request, { params }: Context) {
   if (failure) return failure
   const { requestId } = await params
   try {
-    const { stored } = findRequest(requestId)
+    const { stored, store, save } = await findRequest(requestId)
     if (stored.decision?.holderId !== holder.holderId || !stored.shareReference) {
       throw new RequestError(409, 'Nothing to share for this request.')
     }
@@ -39,7 +39,8 @@ export async function POST(request: Request, { params }: Context) {
     if (!isExpectation(body.expected)) throw new RequestError(400, 'The request was malformed.')
 
     await (await shareService()).publish(stored.shareReference, body.envelope)
-    requests.shared(requestId, body.expected)
+    store.shared(requestId, body.expected)
+    await save()
     return new Response(null, { status: 204, headers: noStore })
   } catch (error) {
     return vaultErrorResponse(error)

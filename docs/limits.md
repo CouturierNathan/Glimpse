@@ -32,14 +32,13 @@ What this prototype does not do, on purpose or for lack of time.
   verified, and the holder's screen says so. Memory is bounded (2,000 open requests).
 
 - **No key backup or recovery.** Keys kept in one browser cannot be moved to another.
-- **Server state is in memory.** Holders' registered public keys, verification requests, decisions,
-  extraction consents and identity reports are lost when the server restarts. Only the encrypted
-  items and the shares' grants, key envelopes and revocation markers are written to disk
-  (`VAULT_DATA_DIR`).
-- **Single server.** The stores are per process: running several instances behind a load balancer
-  would split them. The hosted deployment is exactly that case — each function instance has its own
-  memory and its own `/tmp` — so a journey has to be run in one sitting. See
-  [deploy.md](deploy.md#what-a-hosted-deployment-does-not-keep).
+- **Server state needs a shared store to span instances.** With Redis configured (Upstash, Vercel
+  KV), every instance shares the vault, identities and requests. Without it, a single server keeps
+  them on its disk (`VAULT_DATA_DIR`) across restarts, and a serverless deployment keeps them only
+  while an instance lives. See [deploy.md](deploy.md#shared-state-link-a-redis-store-required-for-a-lasting-deployment).
+- **Last write wins on a request.** A request's state is one value in the store; two answers to the
+  same request at the same instant could overwrite each other. Only the holder who claimed it
+  answers, one piece after another, so this needs the same holder in two tabs at once.
 - **The durable store is POSIX only.** It opens with `O_NOFOLLOW`, publishes with a hard link and
   keeps its directories private by mode. It refuses to start where those are missing rather than
   dropping them, and the app then holds the ciphertext in the server's memory, which writes nothing

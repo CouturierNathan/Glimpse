@@ -1,24 +1,29 @@
 import type { AuthenticatedHolder } from '@glimpse/vault/server'
 
 import { REQUESTER_PROOF_HEADER, verifyRequesterProof } from '@/lib/request-proof.ts'
-import { type RequestBundle, RequestError, type StoredRequest } from '@/lib/requests.ts'
+import {
+  type OpenBundle,
+  type RequestBundle,
+  RequestError,
+  type StoredRequest,
+} from '@/lib/requests.ts'
 import { readLimitedBody } from '@/lib/vault/http.ts'
-import { bundles, requests } from '@/lib/vault/server.ts'
+import { requests } from '@/lib/vault/server.ts'
 
-const OPAQUE_ID = /^[0-9a-f]{32}$/
-
-/** The stored request and its bundle, or a 404 for an unknown or malformed id. */
-export function findRequest(requestId: string): { stored: StoredRequest; bundle: RequestBundle } {
-  const stored = OPAQUE_ID.test(requestId) ? requests.get(requestId) : null
-  const bundle = stored ? bundles.ofRequest(requestId) : null
-  if (!stored || !bundle) throw new RequestError(404, 'This request does not exist.')
-  return { stored, bundle }
+/** A piece, its stored state and its bundle, or a 404 for an unknown or malformed id. */
+export async function findRequest(
+  requestId: string,
+): Promise<OpenBundle & { stored: StoredRequest }> {
+  const opened = await requests.openPiece(requestId)
+  const stored = opened?.store.get(requestId)
+  if (!opened || !stored) throw new RequestError(404, 'This request does not exist.')
+  return { ...opened, stored }
 }
 
-export function findBundle(bundleId: string): RequestBundle {
-  const bundle = OPAQUE_ID.test(bundleId) ? bundles.get(bundleId) : null
-  if (!bundle) throw new RequestError(404, 'This request does not exist.')
-  return bundle
+export async function findBundle(bundleId: string): Promise<OpenBundle> {
+  const opened = await requests.open(bundleId)
+  if (!opened) throw new RequestError(404, 'This request does not exist.')
+  return opened
 }
 
 /** Whether the call carries a fresh proof that it comes from the bundle's requester. */
