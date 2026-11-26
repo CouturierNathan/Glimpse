@@ -1,6 +1,6 @@
-import { constants } from 'node:fs'
 import { spawnSync } from 'node:child_process'
-import { assertHolderId, assertReference, StorageError } from './storage.ts'
+import { fileStorageSupported } from './files.ts'
+import { createMemoryStorageBackend } from './memory.ts'
 import type { StorageBackend } from './storage.ts'
 
 /**
@@ -11,7 +11,7 @@ import type { StorageBackend } from './storage.ts'
  * reporting a storage failure the platform can never satisfy.
  */
 export function posixStorageSkip(): string | false {
-  if (process.platform === 'win32' || typeof constants.O_NOFOLLOW !== 'number') {
+  if (process.platform === 'win32' || !fileStorageSupported()) {
     return 'file storage needs POSIX: O_NOFOLLOW, hard links and private directory modes'
   }
   return false
@@ -33,28 +33,7 @@ export function pdfToolsSkip(): string | false {
   return `needs ${missingPdfTools.join(', ')}: install poppler-utils and tesseract-ocr`
 }
 
-/** Test-only adapter; never use as the local demo's durable backend. */
+/** The in-process adapter, under the name the tests already use. */
 export function createMemoryStorageBackendForTests(): StorageBackend {
-  const objects = new Map<string, Uint8Array>()
-  function key(holderId: string, ref: string): string {
-    assertHolderId(holderId)
-    assertReference(ref)
-    return `${holderId}:${ref}`
-  }
-  return {
-    create(holderId, ref, bytes) {
-      const id = key(holderId, ref)
-      if (objects.has(id)) return Promise.resolve(false)
-      objects.set(id, bytes.slice())
-      return Promise.resolve(true)
-    },
-    read(holderId, ref, maxBytes) {
-      const bytes = objects.get(key(holderId, ref))
-      if (bytes && bytes.length > maxBytes) return Promise.reject(new StorageError('CORRUPT'))
-      return Promise.resolve(bytes?.slice() ?? null)
-    },
-    remove(holderId, ref) {
-      return Promise.resolve(objects.delete(key(holderId, ref)))
-    },
-  }
+  return createMemoryStorageBackend()
 }

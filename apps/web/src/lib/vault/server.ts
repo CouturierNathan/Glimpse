@@ -41,11 +41,29 @@ function storageDirectory(): string {
   return process.env.VAULT_DATA_DIR ?? join(process.cwd(), '.vault-data')
 }
 
+export type StorageMode = 'file' | 'memory'
+
+/**
+ * Which store the vault runs on. `VAULT_STORAGE` decides when it is set; otherwise the file one
+ * is used wherever it can run. It cannot run on Windows, which has neither `O_NOFOLLOW` nor
+ * `O_NONBLOCK`, so there the app keeps the ciphertext in this process rather than refusing every
+ * vault request. Memory is not a weaker store — it writes nothing at all — but it is not durable,
+ * and the screens say so.
+ */
+export async function storageMode(): Promise<StorageMode> {
+  if (process.env.VAULT_STORAGE === 'memory') return 'memory'
+  if (process.env.VAULT_STORAGE === 'file') return 'file'
+  const { fileStorageSupported } = await vaultServer()
+  return fileStorageSupported() ? 'file' : 'memory'
+}
+
 async function backend(): Promise<StorageBackend> {
-  const { createFileStorageBackend } = await vaultServer()
-  return (shared.glimpseVaultBackend ??= createFileStorageBackend({
-    directory: storageDirectory(),
-  }).catch((error: unknown) => {
+  const vault = await vaultServer()
+  return (shared.glimpseVaultBackend ??= (
+    (await storageMode()) === 'memory'
+      ? Promise.resolve(vault.createMemoryStorageBackend())
+      : vault.createFileStorageBackend({ directory: storageDirectory() })
+  ).catch((error: unknown) => {
     shared.glimpseVaultBackend = undefined // let the next request retry
     throw error
   }))

@@ -12,7 +12,12 @@ export type {
   StorageBackend,
   StorageErrorCode,
 } from './storage.ts'
-export { createFileStorageBackend, DEFAULT_STORAGE_DIRECTORY } from './files.ts'
+export {
+  createFileStorageBackend,
+  fileStorageSupported,
+  DEFAULT_STORAGE_DIRECTORY,
+} from './files.ts'
+export { createMemoryStorageBackend } from './memory.ts'
 export { createShareService } from './sharing.ts'
 export type { ConsentDecision } from './sharing.ts'
 export {

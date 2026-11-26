@@ -19,6 +19,15 @@ export const DEFAULT_STORAGE_DIRECTORY = join(
   dirname(fileURLToPath(import.meta.url)),
   '../../.vault-data/',
 )
+/**
+ * Whether this platform has what the file backend needs: `O_NOFOLLOW` and `O_NONBLOCK`. Windows
+ * defines neither, and `flags | undefined` drops the flag without an error, so the symlink
+ * protection would be a silent no-op there. A caller picks another backend instead of starting
+ * one that cannot keep its promises.
+ */
+export function fileStorageSupported(): boolean {
+  return typeof constants.O_NOFOLLOW === 'number' && typeof constants.O_NONBLOCK === 'number'
+}
 function code(error: unknown): string | undefined {
   return error && typeof error === 'object' && 'code' in error ? String(error.code) : undefined
 }
@@ -49,9 +58,7 @@ export async function createFileStorageBackend(
   // nothing, a bundler traces the whole repository into the deployed function to be safe.
   const root = resolve(/* turbopackIgnore: true */ options.directory ?? DEFAULT_STORAGE_DIRECTORY)
   // Do not silently weaken symlink protection on an unsupported filesystem/platform.
-  if (typeof constants.O_NOFOLLOW !== 'number' || typeof constants.O_NONBLOCK !== 'number') {
-    throw new StorageError('UNAVAILABLE')
-  }
+  if (!fileStorageSupported()) throw new StorageError('UNAVAILABLE')
   try {
     await mkdir(root, { recursive: true, mode: 0o700 })
     await checkDirectory(root)
