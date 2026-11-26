@@ -85,5 +85,16 @@ describe('indexRegistries', async () => {
       (await registry.read.getAnchor([attestationId])).revokedAt,
     )
     assert.equal(caughtUp.toBlock, await publicClient.getBlockNumber())
+
+    // Several ranges in flight at once fold to the same index, and report their progress.
+    const progress: number[] = []
+    const parallel = await indexRegistries({
+      ...config,
+      concurrency: 4,
+      onProgress: (done) => progress.push(done),
+    })
+    assert.deepEqual(parallel, caughtUp)
+    assert.equal(progress.at(-1), 1)
+    assert.ok(progress.every((p, i) => i === 0 || p >= (progress[i - 1] ?? 0)))
   })
 })

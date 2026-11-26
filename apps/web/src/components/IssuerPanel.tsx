@@ -37,6 +37,7 @@ import {
   MAX_VALID_DAYS,
   parseAttestedValue,
 } from '@/lib/issuer.ts'
+import { decodeRegistryIndex, loadRegistryIndex, saveRegistryIndex } from '@/lib/registry-cache.ts'
 import { importAttributes } from '@/lib/vault/attributes.ts'
 import { wagmiConfig } from '@/lib/wagmi.ts'
 import { describeWalletError, walletAccount, WalletError, walletMessages } from '@/lib/wallet.ts'
@@ -142,6 +143,7 @@ function Issuer() {
   const [issued, setIssued] = useState<Issued | null>(null)
   const [attribute, setAttribute] = useState(importAttributes[0]?.attribute ?? '')
   const indexRef = useRef<RegistryIndex | null>(null)
+  const [progress, setProgress] = useState<number | null>(null)
 
   /** Reads new registry events; returns the index so a caller can wait for its own change. */
   const refresh = useCallback(async () => {
@@ -154,11 +156,16 @@ function Issuer() {
           attestationRegistry,
           fromBlock: registriesDeployedAt,
           step: INDEX_STEP,
+          // The RPC caps a call at 50,000 blocks; several in flight make the first read seconds long.
+          concurrency: 8,
+          onProgress: (done) => setProgress(done),
         },
         indexRef.current ?? undefined,
       )
       indexRef.current = next
+      saveRegistryIndex(next)
       setIndex({ ...next })
+      setProgress(null)
       return next
     } catch {
       setIndexError(true)
@@ -166,8 +173,23 @@ function Issuer() {
     }
   }, [])
 
+  // What this browser read before shows at once; a first visit starts from the server's copy.
+  // Either way only the blocks after it are read here, from the chain.
   useEffect(() => {
-    void refresh()
+    void (async () => {
+      let start = loadRegistryIndex()
+      if (!start) {
+        start = await fetch('/api/registry', { cache: 'no-store' })
+          .then((res) => (res.ok ? res.text() : null))
+          .then((text) => (text ? decodeRegistryIndex(text) : null))
+          .catch(() => null)
+      }
+      if (start) {
+        indexRef.current = start
+        setIndex(start)
+      }
+      await refresh()
+    })()
   }, [refresh])
 
   const mineOf = (from: RegistryIndex | null) =>
@@ -296,10 +318,16 @@ function Issuer() {
             }
           />
         ) : (
-          <p className="hint loading-line">
-            <span className="spinner" aria-hidden="true" />
-            {t('issue.reading')}
-          </p>
+          <div className="loading-block">
+            <p className="hint loading-line">
+              <span className="spinner" aria-hidden="true" />
+              {t('issue.reading')}
+              {progress !== null && ` ${Math.round(progress * 100)} %`}
+            </p>
+            {progress !== null && (
+              <progress className="progress-bar" max={1} value={progress} aria-hidden="true" />
+            )}
+          </div>
         )}
       </div>
     )
