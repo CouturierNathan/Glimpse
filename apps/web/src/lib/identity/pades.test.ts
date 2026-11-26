@@ -8,12 +8,10 @@ import * as asn1js from 'asn1js'
 import { pemCertificates, validatePades } from './pades.ts'
 
 // FAKE fixtures from scripts/make-fake-identity-pdf.ts: a TEST CA, never a real trust anchor.
-const fixture = (file: string) =>
-  new Uint8Array(readFileSync(new URL(`../../../fixtures/identity/${file}`, import.meta.url)))
+const fixtures = new URL('../../../../../tests/fixtures/documents/', import.meta.url)
+const fixture = (file: string) => new Uint8Array(readFileSync(new URL(file, fixtures)))
 const proof = fixture('FAKE-identity-proof.pdf')
-const trustAnchors = pemCertificates(
-  readFileSync(new URL('../../../fixtures/identity/FAKE-test-ca.pem', import.meta.url), 'utf8'),
-)
+const trustAnchors = pemCertificates(readFileSync(new URL('FAKE-test-ca.pem', fixtures), 'utf8'))
 const now = new Date('2026-11-07T10:00:00.000Z')
 const validate = (pdf: Uint8Array, at = now, anchors = trustAnchors) =>
   validatePades(pdf, { trustAnchors: anchors, now: at })
@@ -43,12 +41,16 @@ test('the FAKE signed proof passes against the TEST CA', async () => {
 
 test('a PDF modified after signing fails integrity', async () => {
   const modified = Uint8Array.from(proof)
-  const at = Buffer.from(proof).indexOf('FAKE TEST HOLDER')
+  const at = Buffer.from(proof).indexOf('SYNTHETIQUE')
   modified[at] = 'X'.charCodeAt(0)
   const report = await validate(modified)
   assert.equal(report.indication, 'TOTAL_FAILED')
   assert.equal(report.subIndication, 'HASH_FAILURE')
   assert.equal(report.checks.integrity, 'fail')
+
+  // The shipped falsified copy fails the same way.
+  const shipped = await validate(fixture('FAKE-identity-proof-tampered.pdf'))
+  assert.equal(shipped.subIndication, 'HASH_FAILURE')
 
   const appended = Buffer.concat([proof, Buffer.from('\n% unsigned update\n')])
   const update = await validate(appended)
@@ -73,6 +75,10 @@ test('a signer outside the trust anchors fails the chain', async () => {
   assert.equal(wrong.subIndication, 'NO_CERTIFICATE_CHAIN_FOUND')
   assert.equal(wrong.checks.chain, 'fail')
   assert.equal(wrong.trustAnchor, undefined)
+
+  // A proof for another person is still validly signed: the name check is a separate step.
+  const other = await validate(fixture('FAKE-identity-proof-other-person.pdf'))
+  assert.equal(other.indication, 'TOTAL_PASSED')
 
   const untrusted = await validate(proof, now, [])
   assert.equal(untrusted.subIndication, 'NO_CERTIFICATE_CHAIN_FOUND')
