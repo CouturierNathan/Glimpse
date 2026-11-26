@@ -77,31 +77,40 @@ curl -i https://<project>.vercel.app/verify           # 307 to /login when signe
 
 Then sign in with a wallet on Base Sepolia and walk one import, one request and one verification.
 
-## Mirror to the Epitech repository
+## Mirrors
 
-The hand-in has to sit in the school's repository too.
-[`.github/workflows/mirror.yml`](../.github/workflows/mirror.yml) pushes every branch and tag to it
-on each push to `main`, and can be run by hand from the Actions tab. It stays skipped until both
-settings below exist, so it never fails for want of them.
+Two copies follow this repository: the school's repository (the hand-in) and a personal public
+repository, which Vercel deploys from because it cannot reach this private one.
+[`.github/workflows/mirror.yml`](../.github/workflows/mirror.yml) pushes every branch and tag to
+each of them on every push to `main`, and can be run by hand from the Actions tab. A target stays
+skipped until its two settings exist, so it never fails for want of them.
 
-1. Generate a key pair whose private half only GitHub Actions holds:
+| Target   | Repository variable   | Secret                |
+| -------- | --------------------- | --------------------- |
+| Epitech  | `EPITECH_REPOSITORY`  | `EPITECH_DEPLOY_KEY`  |
+| Personal | `PERSONAL_REPOSITORY` | `PERSONAL_DEPLOY_KEY` |
+
+For each target:
+
+1. Generate a key pair whose private half only GitHub Actions holds (one per target):
 
    ```sh
    ssh-keygen -t ed25519 -C "glimpse-mirror" -f glimpse-mirror -N ""
    ```
 
-2. In the **Epitech** repository: Settings → Deploy keys → Add deploy key, paste
+2. In the **target** repository: Settings → Deploy keys → Add deploy key, paste
    `glimpse-mirror.pub`, and tick **Allow write access**.
-3. In **this** repository: Settings → Secrets and variables → Actions.
-   - Secrets → New repository secret: `EPITECH_DEPLOY_KEY`, the contents of `glimpse-mirror`
+3. In **this** repository (admin rights needed): Settings → Secrets and variables → Actions.
+   - Secrets → New repository secret: `<TARGET>_DEPLOY_KEY`, the contents of `glimpse-mirror`
      (the private key, including its `-----BEGIN`/`-----END` lines).
-   - Variables → New repository variable: `EPITECH_REPOSITORY`, the SSH URL of the Epitech
+   - Variables → New repository variable: `<TARGET>_REPOSITORY`, the SSH URL of the target
      repository, for example `git@github.com:EpitechPGE5Innovation/glimpse.git`.
-4. Delete the local `glimpse-mirror` key file. Never commit it.
-5. Actions → Mirror → Run workflow, and check it is green.
+4. Delete the local key files. Never commit them.
+5. Actions → Mirror → Run workflow, and check both jobs are green.
 
-`git push --mirror` makes the Epitech repository match this one exactly: it also deletes refs there
-that no longer exist here. That is what a mirror means; it is the point.
+`git push --mirror` makes each target match this repository exactly: it also deletes refs there
+that no longer exist here. That is what a mirror means; commit to this repository, never to a
+mirror.
 
 ### By hand, without the workflow
 
