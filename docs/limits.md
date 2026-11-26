@@ -26,9 +26,14 @@ What this prototype does not do, on purpose or for lack of time.
   would split them. The hosted deployment is exactly that case — each function instance has its own
   memory and its own `/tmp` — so a journey has to be run in one sitting. See
   [deploy.md](deploy.md#what-a-hosted-deployment-does-not-keep).
-- **POSIX only.** The encrypted store opens with `O_NOFOLLOW`, publishes with a hard link and keeps
-  its directories private by mode. It refuses to start where those are missing rather than dropping
-  them, so the app runs on Linux and macOS, and on Windows through WSL.
+- **The durable store is POSIX only.** It opens with `O_NOFOLLOW`, publishes with a hard link and
+  keeps its directories private by mode. It refuses to start where those are missing rather than
+  dropping them, and the app then holds the ciphertext in the server's memory, which writes nothing
+  at all but does not survive a restart. `VAULT_STORAGE` forces either one.
+- **Reading a PDF needs poppler.** `pdfinfo`, `pdftotext` and `pdftoppm` turn an uploaded PDF into
+  text, and `tesseract` reads a scanned one. A host without them takes the text documents only, so
+  the hosted demo imports as class A; a signed PDF, and with it class B, needs a machine that has
+  them.
 
 ## Chain
 

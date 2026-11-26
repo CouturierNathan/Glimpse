@@ -16,9 +16,11 @@ openssl rand -base64 32   # paste it as SESSION_SECRET in apps/web/.env.local
 npm run dev -w apps/web   # http://localhost:3000
 ```
 
-On Windows, run the app through WSL: the encrypted store is POSIX object storage and refuses to
-start on a filesystem without `O_NOFOLLOW`, hard links and directory mode bits. Everything else —
-the checks below, the contracts, the browser — runs natively.
+The app runs natively on Windows. The encrypted store is POSIX object storage and refuses to start
+where `O_NOFOLLOW`, hard links and directory mode bits are missing, so there the app keeps the
+ciphertext in the server's memory instead and the vault screen says so. Use WSL, or set
+`VAULT_STORAGE=file` on a POSIX machine, when the items have to survive a restart. The only part
+that needs more than Node is reading a PDF's text, which uses poppler.
 
 To host it instead of running it locally, see [deploy.md](deploy.md).
 
@@ -29,7 +31,8 @@ To host it instead of running it locally, see [deploy.md](deploy.md).
 | `SESSION_SECRET`                     | none, required                               | HMAC key of the session cookies                                                                  |
 | `PADES_TRUST_ANCHORS`                | unset: no PDF signature is trusted           | PEM bundle of accepted CAs. Demo only: `fixtures/identity/FAKE-test-ca.pem`                      |
 | `OLLAMA_MODEL`                       | unset: offline synthetic extractor           | Local Ollama model for extraction. The synthetic extractor only accepts synthetic demo documents |
-| `VAULT_DATA_DIR`                     | `apps/web/.vault-data`                       | Where the encrypted items are written                                                            |
+| `VAULT_DATA_DIR`                     | `apps/web/.vault-data`                       | Where the encrypted items are written, when the file store runs                                  |
+| `VAULT_STORAGE`                      | unset: file where it runs, else memory       | `file` or `memory`. The file store needs POSIX and refuses to start elsewhere                    |
 | `NEXT_PUBLIC_ATTESTATION_REGISTRY`   | `0xE481E72D9aBe5B4a43405B2C58cAA972d0a6dDd6` | AttestationRegistry the issuer anchors in and the verifier reads                                 |
 | `NEXT_PUBLIC_ISSUER_REGISTRY`        | `0x07Ee362e4FFA3c6c21cBB41eb545FA45c16CF9ee` | IssuerRegistry                                                                                   |
 | `NEXT_PUBLIC_REGISTRIES_DEPLOYED_AT` | `55053387`                                   | Block the issuer portal's indexer starts from                                                    |
@@ -37,9 +40,27 @@ To host it instead of running it locally, see [deploy.md](deploy.md).
 
 ## Demo documents
 
-`apps/web/fixtures/identity/` holds FAKE test files: `FAKE-identity-proof.pdf` passes against
-`FAKE-test-ca.pem`, `FAKE-identity-proof-wrong-signer.pdf` fails the chain check. Rebuild them with
-`npm run fixtures:identity -w apps/web`. None of them is a real France Identité document.
+The app offers them: the import screen and the identity check each link the files they take, and
+the app serves them from `apps/web/public/demo/`. Nothing else is needed to run a demo.
+
+| File                                     | What it shows                                          |
+| ---------------------------------------- | ------------------------------------------------------ |
+| `FAKE-identity-proof.pdf`                | A proof that passes against `FAKE-test-ca.pem`         |
+| `FAKE-identity-proof-wrong-signer.pdf`   | The same proof from a signer no trusted CA certifies   |
+| `demo-complete-record.txt`               | All 19 attributes: identity, address, education, work  |
+| `demo-student-certificate.txt`           | Identity, address and education                        |
+| `demo-employment-certificate.txt`        | Identity, job, contract and salary                     |
+| `FAKE-signed-synthetic-certificate.pdf`  | The student certificate, signed: imports as class B    |
+| `FAKE-signed-employment-certificate.pdf` | The employment certificate, signed: imports as class B |
+
+They describe an invented person; none is a real France Identité document or a real trust anchor.
+Rebuild them all with `npm run fixtures:identity -w apps/web`, which writes both `public/demo/`
+and the `fixtures/identity/` copies the tests and `PADES_TRUST_ANCHORS` read.
+
+The text documents import anywhere. The signed PDFs are the ones that come back as class B, and
+reading a PDF's text needs poppler on the server, so they work where `pdftotext` is installed and
+not on a host without it. `npm run check:demo -w apps/web` runs the real extractor over the text
+documents and fails if a label stops matching.
 
 ## Checks
 
