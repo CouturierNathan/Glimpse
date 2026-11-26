@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "npm run typecheck && node --test \"src/**/*.test.ts\"",
+    "test": "npm run typecheck && node --test \"src/**/*.test.ts\" && npm run check:demo",
+    "check:demo": "node scripts/check-demo-documents.ts",
     "fixtures:identity": "node scripts/make-fake-identity-pdf.ts"
   },
   "devDependencies": {

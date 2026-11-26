@@ -1,0 +1,16 @@
+SYNTHETIC DEMO - invented person, no real identity or secret
+STUDENT CERTIFICATE
+Name: CAMILLE SYNTHETIQUE; period 2026-01-01 to 2026-12-31
+Date of birth: 12/04/2001; period 2026-01-01 to 2026-12-31
+Age: 25; period 2026-01-01 to 2026-12-31
+Nationality: French; period 2026-01-01 to 2026-12-31
+Over 18: true; period 2026-01-01 to 2026-12-31
+Address: 14 rue des Lilas; period 2026-01-01 to 2026-12-31
+Postal code: 75011; period 2026-01-01 to 2026-12-31
+City: Paris; period 2026-01-01 to 2026-12-31
+Country: France; period 2026-01-01 to 2026-12-31
+Student: true; period 2026-01-01 to 2026-12-31
+School: Epitech Paris; period 2026-01-01 to 2026-12-31
+Study level: Master 2; period 2026-01-01 to 2026-12-31
+Score: 42; period 2026-01-01 to 2026-12-31
+Graduation year: 2027; period 2026-01-01 to 2026-12-31

@@ -1,0 +1,12 @@
+SYNTHETIC DEMO - invented person, no real identity or secret
+EMPLOYMENT CERTIFICATE
+Name: CAMILLE SYNTHETIQUE; period 2026-01-01 to 2026-12-31
+Date of birth: 12/04/2001; period 2026-01-01 to 2026-12-31
+Age: 25; period 2026-01-01 to 2026-12-31
+Nationality: French; period 2026-01-01 to 2026-12-31
+Over 18: true; period 2026-01-01 to 2026-12-31
+Employed: true; period 2026-01-01 to 2026-12-31
+Employer: Atelier Dubois; period 2026-01-01 to 2026-12-31
+Job title: Backend engineer; period 2026-01-01 to 2026-12-31
+Contract type: Apprenticeship; period 2026-01-01 to 2026-12-31
+Annual salary: 24000; period 2026-01-01 to 2026-12-31
