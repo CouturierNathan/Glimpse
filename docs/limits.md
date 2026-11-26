@@ -43,10 +43,9 @@ What this prototype does not do, on purpose or for lack of time.
   keeps its directories private by mode. It refuses to start where those are missing rather than
   dropping them, and the app then holds the ciphertext in the server's memory, which writes nothing
   at all but does not survive a restart. `VAULT_STORAGE` forces either one.
-- **Reading a PDF needs poppler.** `pdfinfo`, `pdftotext` and `pdftoppm` turn an uploaded PDF into
-  text, and `tesseract` reads a scanned one. A host without them takes the text documents only, so
-  the hosted demo imports as class A; a signed PDF, and with it class B, needs a machine that has
-  them.
+- **Scanned PDFs need OCR tools.** A PDF's text is read in process with pdf.js, everywhere. A
+  scanned page holds no text and goes to `pdftoppm` and `tesseract`; a host without them (the
+  Vercel deployment) refuses scanned documents.
 
 ## Chain
 

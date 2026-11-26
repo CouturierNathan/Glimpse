@@ -175,19 +175,13 @@ const ok = await importDocument(camille, 'demo-student-certificate.txt', [
 ])
 const claims = (ok.body.claims as ExtractedClaim[] | undefined) ?? []
 check(ok.status === 200 && claims.length === 3, 'matching document imports', ok)
-// Needs poppler (pdftotext) on the server: a host without it answers 422, and the check says so.
+// A signed PDF is read in process (pdf.js) and its signature checked: it imports as class B.
 const signed = await importDocument(camille, 'FAKE-signed-synthetic-certificate.pdf', [
   'full_name',
   'school',
 ])
 const source = signed.body.source as { provenance?: { class?: string } } | undefined
-check(
-  signed.status === 422 || source?.provenance?.class === 'B',
-  signed.status === 422
-    ? 'signed PDF skipped: no poppler on the server'
-    : 'signed PDF imports as class B',
-  signed,
-)
+check(source?.provenance?.class === 'B', 'signed PDF imports as class B', signed)
 const other = await importDocument(camille, 'demo-other-person-certificate.txt', [
   'full_name',
   'school',
