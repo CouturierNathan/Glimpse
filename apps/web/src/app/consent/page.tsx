@@ -1,6 +1,7 @@
 import { T } from '@/components/I18nProvider.tsx'
 import { OpenRequest } from '@/components/OpenRequest.tsx'
 import { PageHead } from '@/components/PageHead.tsx'
+import { RequestHistory } from '@/components/RequestHistory.tsx'
 import { StatusLegend } from '@/components/StatusBadge.tsx'
 import { titled } from '@/lib/i18n/server.ts'
 
@@ -20,6 +21,14 @@ export default function ConsentPage() {
         </p>
         <OpenRequest />
       </div>
+
+      <h2 className="section-title">
+        <T k="history.title" />
+      </h2>
+      <p className="hint section-hint">
+        <T k="history.text" />
+      </p>
+      <RequestHistory />
 
       <h2 className="section-title">
         <T k="requests.legend.title" />

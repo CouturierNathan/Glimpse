@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 
 import { formatClaimValue } from '@/lib/format.ts'
+import { rememberRequest } from '@/lib/holder-store.ts'
 import { fetchRequest, type RequestView } from '@/lib/requester.ts'
 import { holderStatus } from '@/lib/status.ts'
 
@@ -96,6 +97,20 @@ export function RequestReview({ requestId }: { requestId: string }) {
         if (picked) await share(item.requestId, picked)
         else await refuse(item.requestId)
       }
+      // The holder's own record of what they agreed to. It never leaves this browser.
+      await rememberRequest({
+        requestId,
+        requesterName: view.requesterName,
+        purpose: view.purpose,
+        createdAt: view.createdAt,
+        expiresAt: view.expiresAt,
+        answeredAt: new Date().toISOString(),
+        items: picks.map(({ item, share: picked }) => ({
+          requestId: item.requestId,
+          attribute: item.attribute,
+          shared: Boolean(picked),
+        })),
+      }).catch(() => undefined)
     })
   }
 
